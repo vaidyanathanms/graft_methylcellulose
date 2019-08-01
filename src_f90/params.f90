@@ -1,0 +1,90 @@
+MODULE PARAMS_SOLVATEDMC
+
+  USE OMP_LIB
+  IMPLICIT NONE
+
+  ! Required Input Variables
+
+  INTEGER :: initdist
+  INTEGER :: nframes, skipfr
+  INTEGER :: nsolvent, nchains
+  INTEGER :: nmons_backbone
+  INTEGER :: num_at_type_solv,num_at_type_perchain,graft_type
+  INTEGER :: nproc
+
+  !Structural analysis input details
+
+  INTEGER :: rdffreq,rmaxbin,npairs
+  REAL    :: rclus_cut,rvolavg,rdomcut,rbinval,oxycut
+  INTEGER :: rgfreq, oxyfreq, oxytype,eigfreq, comfreq
+  INTEGER :: oxyrestype, oxyrescut
+  INTEGER :: rg_s_freq
+  INTEGER :: densfreq, dens_axis, ndentypes, maxden_bin
+  REAL    :: normdens,denbinavg
+  INTEGER :: nanglmain, skip_tailmon
+  INTEGER :: resegfreq
+
+  ! All flags
+  
+  INTEGER :: rdfcalc, rgcalc, oxycalc, rescalc,eigcalc,indeig,eigMC
+  INTEGER :: rgall, rgsys
+  INTEGER :: denscalc, perscalc, comcalc, resegcalc
+
+  ! File names and unit Numbers
+  
+  CHARACTER(LEN = 256) :: ana_fname,data_fname,traj_fname,log_fname
+  CHARACTER(LEN = 256) :: rdf_fname, dum_fname
+  INTEGER, PARAMETER :: anaread = 2,   logout = 3
+  INTEGER, PARAMETER :: inpread = 100, rgwrite = 400,rgavgwrite = 300
+  INTEGER, PARAMETER :: dumwrite = 200, rgswrite = 250,eigwrite=275
+  INTEGER, PARAMETER :: eigMCwrite = 325, rergwrite = 350,comwrite=355
+
+  !Math Constants
+
+  REAL*8, PARAMETER :: pival  = 3.14159265359
+  REAL*8, PARAMETER :: pi2val = 2.0*pival
+  REAL*8, PARAMETER :: theta2rad = pival/180.0
+  REAL*8, PARAMETER :: rad2theta = 180.0/pival
+
+  !Global analysis variables and arrays
+
+  INTEGER :: atomflag, velflag, bondflag, anglflag, dihdflag,imprflag
+  INTEGER :: ntotatoms, ntotbonds, ntotangls,ntotdihds,ntotimprs
+  INTEGER :: ntotatomtypes,ntotbondtypes,ntotangltypes,ntotdihdtypes&
+       &,ntotimprtypes
+
+  !Lammps trajectory file read details
+
+  REAL :: box_xl,box_yl,box_zl, boxval
+  INTEGER*8 :: timestep
+
+  !Structural variables
+
+  INTEGER :: rdfpaircnt
+  REAL    :: rvolval
+  
+  !Structural Average Variables
+
+  REAL :: re2ave, re4ave, rg2ave, rg4ave, b2ave
+  
+  !Required Arrays - LAMMPS
+
+  REAL*8, ALLOCATABLE, DIMENSION(:,:) :: rxyz_lmp, vel_xyz, charge_lmp&
+       &,masses
+  INTEGER, ALLOCATABLE, DIMENSION(:,:) :: bond_lmp, angl_lmp,&
+       & dihd_lmp, impr_lmp,aidvals
+  CHARACTER,ALLOCATABLE,DIMENSION(:,:) :: keywords
+  REAL,ALLOCATABLE,DIMENSION(:):: boxx_arr, boxy_arr,boxz_arr
+
+  !Required Arrays - Structural Quantities
+
+  REAL,ALLOCATABLE,DIMENSION(:,:):: rdfarray, densarray
+  REAL,ALLOCATABLE,DIMENSION(:) ::  histoxyarray,tplot_cf
+  INTEGER,ALLOCATABLE,DIMENSION(:,:):: pairs_rdf, autocf
+  INTEGER, ALLOCATABLE, DIMENSION(:) :: lenarray,oxyarray,oxyresarray&
+       &, dentyp_arr,chain_attypes,num_atoms_perchain,solv_attypes
+  REAL, ALLOCATABLE, DIMENSION(:,:) :: eigarray
+  REAL, ALLOCATABLE, DIMENSION(:) :: avgtheta_main, avgdot_main&
+       &,resegarr
+
+END MODULE PARAMS_SOLVATEDMC
