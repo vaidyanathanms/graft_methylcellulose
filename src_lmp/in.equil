@@ -1,0 +1,57 @@
+#### LAMMPS input file for semiflexible simulations ###############
+#### Version : Feb-15-2019 ########################################
+#Stage1: Minimization and equilibration
+#---------------Run a few steps to completely equilibrate system--#
+
+log             log.single
+units           lj
+boundary        p p p
+atom_style      molecular
+bond_style      harmonic
+angle_style     harmonic
+dihedral_style  harmonic
+improper_style  none
+pair_style      lj/cut 1.12246204831
+
+#-------------------Data read and Pair initialize-------------------#
+
+read_data       input.data 
+include         in.pair
+pair_modify     shift yes mix geometric
+special_bonds   lj 0 0 0
+
+#--------------------Initialize-------------------------------------#
+
+thermo_style    custom step temp press etotal epair density
+thermo          2000
+neighbor        1.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+#--------------------Remove Overlaps--------------------------------#
+
+fix 1 all nve/limit 0.001
+fix 2 all momentum 1000 linear 1 1 1
+dump 1 all custom 10000 dump_stage1.lammpstrj id type xu yu zu
+run 100000
+unfix 1
+unfix 2
+write_data min.data
+
+#---------------Main Run begins here-------------------------------#
+
+velocity all create 1.0 29834732 rot yes dist gaussian
+
+fix 1 all nvt temp 0.1 1.0 1.0 
+fix 2 all momentum 100000 linear 1 1 1
+
+restart 5000 restart2 restart1
+restart 1000000 archive_initrestart.* 
+timestep 0.0005
+run 2000000
+
+restart 2000000 archive_restart.* 
+timestep 0.001
+run 20000000
+
+write_restart run1.*
+write_data run_equil.data

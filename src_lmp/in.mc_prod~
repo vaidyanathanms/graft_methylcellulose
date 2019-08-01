@@ -1,0 +1,35 @@
+#### LAMMPS input file for CG simulations #########################
+#### LAMMPS input file for semiflexible simulations ###############
+#### Version : Feb-15-2019 ########################################
+#Stage2: Production ###############################################
+
+log             log.single
+units           lj
+boundary        p p p
+atom_style      molecular
+read_restart    restart_eq2
+include         in.cgpair_MC
+special_bonds   lj 0 0 0
+pair_modify     shift yes mix geometric
+
+#--------------------Output----------------------------------------#
+
+thermo_style    custom step time temp press
+thermo          50000
+neighbor        1.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+#---------------Main Run begins here-------------------------------#
+
+variable ts equal step
+timestep 0.0005
+fix 1 all nvt temp 1.0 1.0 200*$dt 
+fix 2 all momentum 100000 linear 1 1 1
+dump 1 all custom 2000 dump_stage_${ts}.lammpstrj id type xu yu zu
+
+restart 50000 restart_prod1 restart_prod2
+restart 2000000 archive_restart.*
+run 20000000
+
+write_restart run_prod.*
+write_data run_prod.data
