@@ -27,8 +27,10 @@ from my_python_functions import check_integer
 
 graftopt = 2 # see options above
 wlccheck = 1 # only valid when graftopt = 3, simple WLC model
-restart  = 1 # 0-From beginning, 1-long_equil_prod, 2-long_prod
+restart  = 0 # 0-From beginning, 1-long_equil_prod, 2-long_prod
 mindump  = 20000000 # only applicable for restart cases
+anglstyl = 'harmonic' #cosine or harmonic
+config   = 2
 
 if graftopt != 3:
     wlccheck = 0
@@ -36,13 +38,13 @@ if graftopt != 3:
 #-----------------Input Arrays------------------------------------
 
 #Interaction details
-epsarr_pg   = [0.8,1.0,1.2]  # polymer-graft
-epsarr_ps   = [1.0,1.0,1.0]  # polymer-solvent
-epsarr_sg   = [1.0,1.0,1.0]  # solvent-graft
+epsarr_pg   = [0.8]#,1.0,1.2]  # polymer-graft
+epsarr_ps   = [1.0]#,1.0,1.0]  # polymer-solvent
+epsarr_sg   = [1.0]#,1.0,1.0]  # solvent-graft
 rcut        = pow(2,1/6)
 
 #Chain and initial configuration details
-nchains     = 2 # Number of backbone chains
+nchains     = 8 # Number of backbone chains
 nmons       = [1000]#,500,1000,2000]#,1000,2000] # Number of backbone monomers
 initcom     = 20.0 # Only for 2 chain systems - d_COM as fn(t)
 graftMW     = 25  # number of graft monomers per graft
@@ -50,7 +52,7 @@ polywtperc  = 1.0 # tot_poly wt% - explicit generic
 polydens    = 0.1 # overall density of polymers
 
 #Graft percentage/chain
-graftarr    = [0.01,0.05,0.10,0.15,0.20,0.25,0.30] 
+graftarr    = [0.00] #[0.01,0.05,0.10,0.15,0.20,0.25,0.30] 
 
 #For methylcellulose only
 DS_MC   = '1.80' # String Value - only for methylcellulose
@@ -65,9 +67,9 @@ dumpname = 'dump_stage_*' #include the *
 # For MC it is in built
 k_b = 500.0  # Stretching constant
 r_b = 1.0    # Equilibrium distance
-k_t = 15.0   # Bending constant
-teq = 165.0  # Equilibrium angle
-k_phi = 2.0  # Dihedral constant
+k_t = 10.0   # Bending constant
+teq = 0.0  # Equilibrium angle
+k_phi = 0.0  # Dihedral constant
 
 blist = [k_b, r_b]
 alist = [k_t, teq]
@@ -117,7 +119,11 @@ for bblen in range(len(nmons)): #Backbone length loop
         workdir_main = workdir_main + '/grafts_MC' 
         print ( "Side chain graft system")
     elif graftopt == 3:
-        workdir_main = workdir_main + '/semiflex_grafts' 
+        if anglstyl == 'cosine':
+            workdir_main = workdir_main + '/semiflex_grafts_cosstyle' 
+        else:
+            workdir_main = workdir_main + '/semiflex_grafts' 
+
         print ( "Semiflexible graft system")
     elif graftopt == 3.1:
         workdir_main = workdir_main + '/flex_bb' 
@@ -138,6 +144,11 @@ for bblen in range(len(nmons)): #Backbone length loop
             os.mkdir(workdir_temp)
     else:
         workdir_temp = workdir_bb_main
+
+    #Make trial configuration directory
+    workdir_config = workdir_temp + '/config_' + str(config)
+    if not os.path.isdir(workdir_config):
+        os.mkdir(workdir_config)
 
     #Make number of chains directory
     workdir_chain = workdir_temp + '/nchains_' + str(nchains)
@@ -231,10 +242,10 @@ for bblen in range(len(nmons)): #Backbone length loop
                     continue
 
                 cpy_lammps_files(maindir,srclmp,lmp_execdir,destdir,graftopt,
-                                 data_fname,nmons[bblen],graftarr[glen])
+                                 data_fname,nmons[bblen],graftarr[glen],anglstyl)
                 create_infile(maindir,srclmp,destdir,nmons[bblen],
                               epsarr_pg[eps],graftopt,temp,graftarr[glen],
-                              polywtperc,rcut,blist,alist,k_phi,wlccheck)
+                              polywtperc,rcut,blist,alist,k_phi,wlccheck,anglstyl)
                 generate_backup(maindir,srclmp,lmp_execdir,destdir)
 
             elif restart == 1:
@@ -313,10 +324,10 @@ for bblen in range(len(nmons)): #Backbone length loop
                         continue
 
                     cpy_lammps_files(maindir,srclmp,lmp_execdir,destdir,graftopt,
-                                     data_fname,nmons[bblen],graftarr[glen])
+                                     data_fname,nmons[bblen],graftarr[glen],anglstyl)
                     create_infile(maindir,srclmp,destdir,nmons[bblen],
                                   epsarr_pg[eps],graftopt,temp,graftarr[glen],
-                                  polywtperc,rcut,blist,alist,k_phi,wlccheck)
+                                  polywtperc,rcut,blist,alist,k_phi,wlccheck,anglstyl)
                     generate_backup(maindir,srclmp,lmp_execdir,destdir)
 
                     

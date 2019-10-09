@@ -26,25 +26,26 @@ from my_python_functions import find_recent_file
 # 3.1 - Flexible back bone
 
 graftopt = 2
+wlccheck = 1 #valid only for graftopt = 3
+anglstyl = 'harmonic' #cosine or harmonic
 
 #-----------------Input Arrays------------------------------------
 
-epsarr_pg   = [0.8,1.0,1.2]
-epsarr_ps   = [1.0,1.0,1.0]
-epsarr_sg   = [1.0,1.0,1.0]
+epsarr_pg   = [0.8]#,1.0,1.2]
+epsarr_ps   = [1.0]#,1.0,1.0]
+epsarr_sg   = [1.0]#,1.0,1.0]
 
 nchains     = 1 # Number of backbone chains
-nmons       = [1000] # Number of backbone monomers
+nmons       = [800] # Number of backbone monomers
 graftMW     = 25  # number of graft monomers per graft
 polywtperc  = 1.0 # total polymer weight percentage
 
 #Graft percentage/chain
-graftarr    = [0.01,0.03,0.05,0.08,0.12,0.16,0.2,0.24,0.28,0.32] 
+graftarr    = [0.01,0.05,0.1,0.15,0.2,0.25,0.3]#,0.24,0.28,0.32] 
 
 # polydens = totpart/box_volume - explict generic
 # polydens = wt percentage "MC" - implicit MC
 polydens    = 0.5
-
 
 DS_MC   = '1.80' # String Value
 temp    = '50.0' # String Value 
@@ -82,7 +83,10 @@ for bblen in range(len(nmons)): #Backbone length loop
     elif graftopt == 2:
         workdir_main = workdir_main + '/grafts_MC' 
     elif graftopt == 3:
-        workdir_main = workdir_main + '/semiflex_grafts' 
+        if anglstyl == 'cosine':
+            workdir_main = workdir_main + '/semiflex_grafts_cosstyle' 
+        else:
+            workdir_main = workdir_main + '/semiflex_grafts' 
     elif graftopt == 3.1:
         workdir_main = workdir_main + '/flex_bb' 
         
@@ -123,7 +127,8 @@ for bblen in range(len(nmons)): #Backbone length loop
         continue
 
 
-    out_dir = 'out_'+'ng_MW_' + str(graftMW) + '_rho_'+\
+    out_dir = 'out_'+'bbMW_' + str(nmons[bblen]) + \
+              '_ngMW_' + str(graftMW) + '_rho_'+\
               str(polydens) + '_nch_' + str(nchains)
     anafyl_dir = workdir_graft + '/' + out_dir 
     if not os.path.isdir(anafyl_dir):
@@ -138,7 +143,7 @@ for bblen in range(len(nmons)): #Backbone length loop
         #Continue iff at least one graft is present
         num_graft_molecules = int(graftarr[glen]*nmons[bblen])
         print("Number of graft molecules: ",num_graft_molecules)
-        if num_graft_molecules < 1:
+        if num_graft_molecules < 1 and wlccheck == 0:
             print("number of graft less than 1 for sigma:", graftarr[glen])
             continue
 

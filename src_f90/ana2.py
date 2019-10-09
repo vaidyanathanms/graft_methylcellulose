@@ -28,41 +28,42 @@ from my_python_functions import write_many_files
 # 3 - Grow side chains for semiflexible chains
 # 3.1 - Flexible back bone
 
-graftopt = 3
+graftopt = 2
 nframes  = 1000
 skframes = 0
 nsolv    = 0
 allana   = 1 #1 - analysis of all dumpfiles, 0 - only latest
 prefix_traj = 'dump_stage_*.lammpstrj'
 wlccheck = 1 #only valid when graftopt = 3, simple WLC model
-
+anglstyl = 'harmonic' #cosine or harmonic
 #-----------------Input Arrays------------------------------------
 
-epsarr_pg   = [1.0]#,1.0,1.2]
+epsarr_pg   = [0.8]#,1.0,1.2]
 epsarr_ps   = [1.0]#,1.0,1.0]
 epsarr_sg   = [1.0]#,1.0,1.0]
 
-nchains     = 1 # Number of backbone chains
-nmons       = [2000]#,500,1000,2000] # Number of backbone monomers
+nchains     = 4 # Number of backbone chains
+nmons       = [1000]#,500,1000,2000]#,500,1000,2000] # Number of backbone monomers
 graftMW     = 25  # number of graft monomers per graft
 polywtperc  = 1.0 # total polymer weight percentage
-polydens    = 0.05
+polydens    = 0.1
 
 #Graft percentage/chain
-#graftarr    = [0.01,0.05,0.1,0.15,0.2,0.25,0.3]
+graftarr    = [0.00,0.01,0.05,0.1,0.15,0.2,0.25,0.3]
 #graftarr    = [0.01,0.03,0.05,0.08,0.12,0.16,0.2,0.24,0.28,0.32] 
-graftarr     = [0.00]
+#graftarr     = [0.00]
 
 DS_MC   = '1.80' # String Value
 temp    = '50.0' # String Value 
 
 #-----------------File List---------------------------------------
 
-
-if wlccheck == 0:
-    inpananame = 'anainp_mc_var.txt'
-else:
+if wlccheck == 1 and graftopt == 3:
     inpananame = 'anainp_wlc_var.txt'
+else:
+    inpananame = 'anainp_mc_var.txt'
+
+print("input analysis file", inpananame)
 
 fyl_list    = ['main.f90','ran_numbers.f90','params.f90',
                inpananame,'jobana.sh','jobana_var.sh']
@@ -101,9 +102,14 @@ for bblen in range(len(nmons)): #Backbone length loop
     elif graftopt == 2:
         workdir_main = workdir_main + '/grafts_MC' 
     elif graftopt == 3:
-        workdir_main = workdir_main + '/semiflex_grafts' 
+        if anglstyl == 'cosine':
+            workdir_main = workdir_main + '/semiflex_grafts_cosstyle' 
+        else:
+            workdir_main = workdir_main + '/semiflex_grafts' 
     elif graftopt == 3.1:
         workdir_main = workdir_main + '/flex_bb' 
+    else:
+        print("unknown graft option")
         
     if not os.path.isdir(workdir_main):
         print(workdir_main," does not exist")

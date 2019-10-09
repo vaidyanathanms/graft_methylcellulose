@@ -170,7 +170,7 @@ def find_datafyl_mc(destdir,eps_pg):
 
 
 def cpy_lammps_files(maindir,srclmp,lmp_execdir,destdir,graftopt,
-                     data_fname,nmonval,graftval):
+                     data_fname,nmonval,graftval,angstyle):
 
     os.chdir(destdir)
     print( "Copying LAMMPS files..")                
@@ -183,6 +183,14 @@ def cpy_lammps_files(maindir,srclmp,lmp_execdir,destdir,graftopt,
     
         srcfyl = srclmp + '/in.prod'
         desfyl = destdir + '/in.prod'
+        shutil.copy2(srcfyl, desfyl)
+
+        srcfyl = srclmp + '/in.equil2'
+        desfyl = destdir + '/in.equil2'
+        shutil.copy2(srcfyl, desfyl)
+
+        srcfyl = srclmp + '/in.equil3'
+        desfyl = destdir + '/in.equil3'
         shutil.copy2(srcfyl, desfyl)
 
         if nmonval < 1000:
@@ -218,7 +226,12 @@ def cpy_lammps_files(maindir,srclmp,lmp_execdir,destdir,graftopt,
         fr = open('in.mc_equil_var','r')
     
     fw = open(equil_fyl,'w')
-    fid = fr.read().replace("py_data",data_fname)
+    if int(graftopt) == 3:
+        fid = fr.read().replace("py_data",data_fname).\
+              replace("py_anglestyle",angstyle)
+    else:
+        fid = fr.read().replace("py_data",data_fname)
+    
     fw.write(fid)
     fw.close()
     fr.close()
@@ -234,7 +247,7 @@ def cpy_lammps_files(maindir,srclmp,lmp_execdir,destdir,graftopt,
 
 def create_infile(maindir,srclmp,destdir,nmonval,epsval,
                   graftopt,temp,graft_perc,polywtperc,rcut,
-                  blist,alist,k_phi,wlcflag):
+                  blist,alist,k_phi,wlcflag,angstyle):
 
     os.chdir(destdir)
         
@@ -300,7 +313,12 @@ def create_infile(maindir,srclmp,destdir,nmonval,epsval,
         fw.write('#BondCoeffs \n')
         fw.write('%s\t %s\t %g\t %g\n' %("bond_coeff","*",blist[0],blist[1]))
         fw.write('#AngleCoeffs \n')
-        fw.write('%s\t %s\t %g\t %g\n' %("angle_coeff","*",alist[0],alist[1]))
+        if angstyle == 'cosine':
+            fw.write('%s\t %s\t %g\t\n'
+                     %("angle_coeff","*",alist[0]))
+        else:
+            fw.write('%s\t %s\t %g\t %g\n'
+                     %("angle_coeff","*",alist[0],alist[1]))
         
 
         fw.write('#DihedralCoeffs \n')
