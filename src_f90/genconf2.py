@@ -30,7 +30,7 @@ wlccheck = 1 # only valid when graftopt = 3, simple WLC model
 restart  = 0 # 0-From beginning, 1-long_equil_prod, 2-long_prod
 mindump  = 20000000 # only applicable for restart cases
 anglstyl = 'harmonic' #cosine or harmonic
-config   = 2
+config   = 2 # Trial number
 
 if graftopt != 3:
     wlccheck = 0
@@ -38,21 +38,27 @@ if graftopt != 3:
 #-----------------Input Arrays------------------------------------
 
 #Interaction details
-epsarr_pg   = [0.8]#,1.0,1.2]  # polymer-graft
-epsarr_ps   = [1.0]#,1.0,1.0]  # polymer-solvent
-epsarr_sg   = [1.0]#,1.0,1.0]  # solvent-graft
+
+#epsarr_pg   = [1.2]  # polymer-graft
+#epsarr_ps   = [1.0]  # polymer-solvent
+#epsarr_sg   = [1.0]  # solvent-graft
+
+
+epsarr_pg   = [0.8,1.0,1.2]  # polymer-graft
+epsarr_ps   = [1.0,1.0,1.2]  # polymer-solvent
+epsarr_sg   = [1.0,1.0,1.2]  # solvent-graft
 rcut        = pow(2,1/6)
 
 #Chain and initial configuration details
-nchains     = 8 # Number of backbone chains
+nchains     = 1 # Number of backbone chains
 nmons       = [1000]#,500,1000,2000]#,1000,2000] # Number of backbone monomers
 initcom     = 20.0 # Only for 2 chain systems - d_COM as fn(t)
 graftMW     = 25  # number of graft monomers per graft
 polywtperc  = 1.0 # tot_poly wt% - explicit generic 
-polydens    = 0.1 # overall density of polymers
+polydens    = 0.5 # overall density of polymers
 
 #Graft percentage/chain
-graftarr    = [0.00] #[0.01,0.05,0.10,0.15,0.20,0.25,0.30] 
+graftarr    = [0.01,0.05,0.10,0.15,0.20,0.25,0.30] 
 
 #For methylcellulose only
 DS_MC   = '1.80' # String Value - only for methylcellulose
@@ -151,7 +157,7 @@ for bblen in range(len(nmons)): #Backbone length loop
         os.mkdir(workdir_config)
 
     #Make number of chains directory
-    workdir_chain = workdir_temp + '/nchains_' + str(nchains)
+    workdir_chain = workdir_config + '/nchains_' + str(nchains)
     if not os.path.isdir(workdir_chain):
         os.mkdir(workdir_chain)
 
@@ -396,6 +402,34 @@ for bblen in range(len(nmons)): #Backbone length loop
                     os.chdir(maindir)
                 
             else:
+
+
+                trajflag = 1 #trajectory found=1
+                flagstr  = -1 #is a string = 1
+                latest_trajfyl = find_recent_file(destdir,dumpname)
+
+                #dumpfile should be of type dump_stage_*
+                if latest_trajfyl == "nil":
+                    print("Here")
+                    trajflag = -1
+                else:
+                    delimited_vals = re.split("\W+|_",latest_trajfyl)
+                    timeval = delimited_vals[len(delimited_vals)-2]
+                    #check whether the dumpfile is dump_stage1.*
+                    flagstr = check_integer(timeval)
+                    if flagstr == 1:
+                        print("Did not find matching dumpfile, do rerun")
+                        trajflag = -1
+                    elif int(timeval) < 20000000:
+                        print("Timestep less than 20000000, do rerun")
+                        trajflag = -1
+                    else:
+                        print("Latest timestep: ", timeval)
+
+
+                if trajflag == -1:
+                    print ("Here")
+                    continue
 
                 if int(graftopt) == 3:
                     srcfyl = srclmp + '/in.equil2'
