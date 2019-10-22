@@ -48,12 +48,12 @@ epsarr_sg   = [1.0,1.0,1.2]  # solvent-graft
 rcut        = pow(2,1/6)
 
 #Chain and initial configuration details
-nchains     = 4 # Number of backbone chains
+nchains     = 2 # Number of backbone chains
 nmons       = [1000]#,500,1000,2000]#,1000,2000] # Number of backbone monomers
 initcom     = 20.0 # Only for 2 chain systems - d_COM as fn(t)
 graftMW     = 50  # number of graft monomers per graft
 polywtperc  = 1.0 # tot_poly wt% - explicit generic 
-polydens    = 0.05 # overall density of polymers
+polydens    = 0.1 # overall density of polymers
 
 #Graft percentage/chain
 graftarr    = [0.01,0.05,0.10,0.15,0.20,0.25,0.30] 

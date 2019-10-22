@@ -36,20 +36,22 @@ allana   = 1 #1 - analysis of all dumpfiles, 0 - only latest
 prefix_traj = 'dump_stage_*.lammpstrj'
 wlccheck = 1 #only valid when graftopt = 3, simple WLC model
 anglstyl = 'harmonic' #cosine or harmonic
+config  = 2
+
 #-----------------Input Arrays------------------------------------
 
 epsarr_pg   = [0.8]#,1.0,1.2]
 epsarr_ps   = [1.0]#,1.0,1.0]
 epsarr_sg   = [1.0]#,1.0,1.0]
 
-nchains     = 4 # Number of backbone chains
+nchains     = 2 # Number of backbone chains
 nmons       = [1000]#,500,1000,2000]#,500,1000,2000] # Number of backbone monomers
 graftMW     = 25  # number of graft monomers per graft
 polywtperc  = 1.0 # total polymer weight percentage
 polydens    = 0.1
 
 #Graft percentage/chain
-graftarr    = [0.00,0.01,0.05,0.1,0.15,0.2,0.25,0.3]
+graftarr    = [0.01]#,0.05,0.1,0.15,0.2,0.25,0.3]
 #graftarr    = [0.01,0.03,0.05,0.08,0.12,0.16,0.2,0.24,0.28,0.32] 
 #graftarr     = [0.00]
 
@@ -129,7 +131,13 @@ for bblen in range(len(nmons)): #Backbone length loop
         workdir_temp = workdir_bb_main
 
 
-    workdir_chain = workdir_temp + '/nchains_' + str(nchains)
+    workdir_config = workdir_temp + '/config_' + str(config)
+    if not os.path.isdir(workdir_config):
+        print(workdir_config," does not exist")
+        continue
+
+
+    workdir_chain = workdir_config + '/nchains_' + str(nchains)
     if not os.path.isdir(workdir_chain):
         print(workdir_chain, "not found")
         continue
