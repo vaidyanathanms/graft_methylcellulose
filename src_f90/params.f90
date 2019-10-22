@@ -38,6 +38,7 @@ MODULE PARAMS_SOLVATEDMC
   INTEGER, PARAMETER :: inpread = 100, rgwrite = 400,rgavgwrite = 300
   INTEGER, PARAMETER :: dumwrite = 200, rgswrite = 250,eigwrite=275
   INTEGER, PARAMETER :: eigMCwrite = 325, rergwrite = 350,comwrite=355
+  INTEGER, PARAMETER :: distcomwrite = 365
 
   !Math Constants
 
@@ -86,5 +87,6 @@ MODULE PARAMS_SOLVATEDMC
   REAL, ALLOCATABLE, DIMENSION(:,:) :: eigarray
   REAL, ALLOCATABLE, DIMENSION(:) :: avgtheta_main, avgdot_main&
        &,resegarr
+  INTEGER, ALLOCATABLE, DIMENSION(:)::timestep_arr
 
 END MODULE PARAMS_SOLVATEDMC

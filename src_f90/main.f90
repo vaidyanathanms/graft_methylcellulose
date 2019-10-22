@@ -671,6 +671,13 @@ SUBROUTINE OPEN_STRUCT_OUTPUT_FILES()
      dum_fname = "compos_"//trim(adjustl(traj_fname))
      OPEN(unit = comwrite,file =trim(dum_fname),action="write"&
           &,status="replace")
+
+     IF(nchains == 2) THEN
+        dum_fname = "distcom_"//trim(adjustl(traj_fname))
+        OPEN(unit = distcomwrite,file =trim(dum_fname),action="write"&
+             &,status="replace")
+     END IF
+
   END IF
 
 END SUBROUTINE OPEN_STRUCT_OUTPUT_FILES
@@ -769,7 +776,10 @@ SUBROUTINE STRUCT_INIT()
 
      ALLOCATE(eigarray(nframes,3),stat = AllocateStatus)
      IF(AllocateStatus/=0) STOP "did not allocate eigarray"
+     ALLOCATE(timestep_arr(nframes),stat = AllocateStatus)
+     IF(AllocateStatus/=0) STOP "did not allocate timestep_arr"     
      eigarray = 0.0
+     timestep_arr = 0
 
   END IF
 
@@ -1147,7 +1157,7 @@ SUBROUTINE COMPUTE_RADMC(iframe)
 
 
         IF(j .LT. nmons_backbone) THEN
-           if (k+1 > 1000) print *, j, k
+
            rx = rxyz_lmp(k,1) - rxyz_lmp(k+1,1)
            ry = rxyz_lmp(k,2) - rxyz_lmp(k+1,2)
            rz = rxyz_lmp(k,3) - rxyz_lmp(k+1,3)
@@ -1610,9 +1620,11 @@ SUBROUTINE COMPUTE_EIGVALS(iframe)
   DO i = 1,3
 
      eigarray(iframe,i) = W(i)
-
+     
   END DO
-          
+  
+  timestep_arr(iframe) = timestep
+
 END SUBROUTINE COMPUTE_EIGVALS
 
 !--------------------------------------------------------------------
@@ -1635,6 +1647,7 @@ SUBROUTINE COMPUTE_EIGVALSOFMCCHAIN(iframe)
   REAL :: rxcm, rycm, rzcm
   REAL,DIMENSION(1:nmons_backbone,3) :: rshift_lmp 
 
+
   !Note 1: Ordered in such a way that first chains, then the graft in
   !each chain. THIS IS VERY IMPORTANT.
 
@@ -1644,6 +1657,12 @@ SUBROUTINE COMPUTE_EIGVALSOFMCCHAIN(iframe)
   ! Create SMN (rij matrix)
   SMN_ALL = 0.0
   initmon = 0
+
+  IF (iframe == 1) THEN
+     WRITE(eigMCwrite,'(5(A,2X))') "Timestep","ChainID","LamXsq","LamY&
+          &sq","LamZsq"
+  END IF
+
   DO i = 1,nchains
 
      rshift_lmp = 0.0; SMN = 0.0
@@ -1673,13 +1692,14 @@ SUBROUTINE COMPUTE_EIGVALSOFMCCHAIN(iframe)
 
 
      !Compute eigenvalues ONLY for MC chains -- individually
-     LWORK = -1
+     LWORK = -1; W = 0
      CALL DSYEV('Vectors','Upper',N_LA,SMN,N_LA,W,WORK,LWORK,INFO)
      LWORK = MIN(LWMAX,INT(WORK(1)))
      CALL DSYEV('N','U',N_LA,SMN,N_LA,W,WORK,LWORK,INFO)
      IF(INFO .NE. 0) STOP 'Physically irrelevant Eigenvalues'
 
-     WRITE(eigMCwrite,'(I0,1X,3(F14.6,1X))') iframe,W(1),W(2),W(3)
+     WRITE(eigMCwrite,'(2(I0,1X),3(F14.6,1X))') timestep,i,W(1),W(2)&
+          &,W(3)
 
      initmon = initmon + nmons_backbone
      !Ordered in such a way that first chains, then the graft in each
@@ -1781,6 +1801,7 @@ SUBROUTINE COMPUTE_COM(tval)
   INTEGER :: i,j,atype,a1id,moltype
   REAL    :: mval
   REAL,DIMENSION(1:nchains) :: rxcm,rycm,rzcm,totmass
+  REAL :: xdist, ydist, zdist, rdist
 
   rxcm = 0.0; rycm = 0.0; rzcm = 0.0
   totmass = 0.0
@@ -1806,16 +1827,44 @@ SUBROUTINE COMPUTE_COM(tval)
  
   END DO
 
-  DO i = 1,nchains
+  IF(tval == 1) THEN
 
+     WRITE(comwrite,'(8(A,2X))') "timestep","chainID","xCOM","yCOM"&
+          &,"zCOM","box_xl","box_yl","box_zl"
+
+     IF(nchains == 2) WRITE(distcomwrite,'(5(A,2X))') "timestep","xdis&
+          &t","yidst","zdist","rdist"
+
+  END IF
+  
+  DO i = 1,nchains
+     
      rxcm(i) = rxcm(i)/totmass(i)
      rycm(i) = rycm(i)/totmass(i)
      rzcm(i) = rzcm(i)/totmass(i)
-
-     WRITE(comwrite,'(2(I0,1X),6(F16.8))') tval,i,rxcm(i),rycm(i)&
+     
+     WRITE(comwrite,'(2(I0,1X),6(F16.8))') timestep,i,rxcm(i),rycm(i)&
           &,rzcm(i),box_xl,box_yl,box_zl
-
+     
   END DO
+
+  IF(nchains == 2) THEN
+
+     xdist = rxcm(1) - rxcm(2)
+     ydist = rycm(1) - rycm(2)
+     zdist = rzcm(1) - rzcm(2)
+
+     xdist = xdist - box_xl*ANINT(xdist/box_xl)
+     ydist = ydist - box_yl*ANINT(ydist/box_yl)
+     zdist = zdist - box_zl*ANINT(zdist/box_zl)
+     
+     rdist = sqrt(xdist**2 + ydist**2 + zdist**2)
+     
+     WRITE(distcomwrite,'(I0,1X,4(F16.8))') timestep,xdist,ydist&
+          &,zdist,rdist
+
+  END IF
+
 
 END SUBROUTINE COMPUTE_COM
 
@@ -2274,8 +2323,8 @@ SUBROUTINE OUTPUT_EIGTIME()
 
   DO i = 1, nframes
 
-     WRITE(dumwrite,"(I0,1X,3(F14.6,1X))") i, eigarray(i,1),&
-          & eigarray(i,2), eigarray(i,3)
+     WRITE(dumwrite,"(I0,1X,3(F14.6,1X))") timestep_arr(i),&
+          & eigarray(i,1),eigarray(i,2), eigarray(i,3)
 
   END DO
 
@@ -2464,6 +2513,8 @@ SUBROUTINE ALLOCATE_ARRAYS()
   IF(eigcalc .NE. 1) THEN
      ALLOCATE(eigarray(1,1),stat = AllocateStatus)
      DEALLOCATE(eigarray)
+     ALLOCATE(timestep_arr(1),stat = AllocateStatus)
+     DEALLOCATE(timestep_arr)
   END IF
 
   IF(denscalc) THEN
