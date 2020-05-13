@@ -2,7 +2,7 @@ function rg_plot(config_arr,num_eps_arr,num_sigma_arr,bb_mw,gr_mw,num_bb_chains,
 
 %% Color Codes for Plot
 green = [0 0.5 0.0]; gold = [0.9 0.75 0]; orange = [0.91 0.41 0.17]; brown=[0.6 0.2 0];
-pclr = {'k','r',green,'m',brown,'b', gold};
+pclr = {'k',orange,green,'m',brown,'b','r',gold};
 lsty = {'-','--',':'};
 msty = {'d','s','o','x'};
 
@@ -10,6 +10,7 @@ msty = {'d','s','o','x'};
 rgavg_vals = zeros(length(num_eps_arr),length(num_sigma_arr));
 cntr_arr   = zeros(length(num_eps_arr),length(num_sigma_arr));
 stddev_rg  = zeros(length(num_eps_arr),length(num_sigma_arr));
+normstddev = zeros(length(num_eps_arr),length(num_sigma_arr)); %normalized standard dev
 mean_rg    = zeros(length(num_eps_arr),length(num_sigma_arr));
 rgall_config_vals = zeros(length(num_eps_arr),length(num_sigma_arr),length(config_arr));
 
@@ -54,14 +55,14 @@ for conf_cnt = 1:length(config_arr) %% Config array
         
         rgall_config_vals(myeps_cnt,mysig_cnt,conf_cnt) = rgarr_data(datcnt,3);
         rgavg_vals(myeps_cnt,mysig_cnt) = rgavg_vals(myeps_cnt,mysig_cnt) + rgarr_data(datcnt,3);
-        if rgarr_data(datcnt,3) ~= 0 %% add if and only if value is not zero
+        if rgarr_data(datcnt,3) ~= 0 %% add if and only if value is not zero -- this has to be always true by defn of code
             cntr_arr(myeps_cnt,mysig_cnt) = cntr_arr(myeps_cnt,mysig_cnt)+1;
         end
         
     end
 end
 
-%% Compute Mean and Std Dev
+%% Compute Mean and Standard Error of the Mean
 for eps_cnt = 1:length(num_eps_arr)
     for sig_cnt = 1:length(num_sigma_arr)
         rgavg_vals(eps_cnt,sig_cnt) = rgavg_vals(eps_cnt,sig_cnt)/cntr_arr(eps_cnt,sig_cnt);
@@ -74,9 +75,31 @@ for eps_cnt = 1:length(num_eps_arr)
         % now weed out all the non-zero elements using find command
         [~,~,avgarr] = find(matlab_recheck_avg(:,1));
         
-        mean_rg(eps_cnt,sig_cnt)   = mean(avgarr);
-        stddev_rg(eps_cnt,sig_cnt) = std(avgarr);
+        mean_rg(eps_cnt,sig_cnt)    = mean(avgarr);
+        stddev_rg(eps_cnt,sig_cnt)  = std(avgarr)/sqrt(length(avgarr)); %Standard Error of the Mean       
+    end
+end
+
+for eps_cnt = 1:length(num_eps_arr)
+    for sig_cnt = 1:length(num_sigma_arr)
         
+        term1 = (stddev_rg(eps_cnt,sig_cnt)/mean_rg(eps_cnt,sig_cnt))^2;
+        term2 = (rgstdev/rg0)^2;
+        term3 = (mean_rg(eps_cnt,sig_cnt)/rg0);
+        normstddev(eps_cnt,sig_cnt) = term3*sqrt(term1 + term2);
+        
+    end 
+end     
+   
+% Sanity check: Check see whether there is difference between mean_rg and rgavg_vals
+
+for eps_cnt = 1:length(num_eps_arr)
+    for sig_cnt = 1:length(num_sigma_arr)
+        if rgavg_vals(eps_cnt,sig_cnt) ~= mean_rg(eps_cnt,sig_cnt)
+            fprintf('ERROR: @ sig: %g/eps: %g',num_sigma_arr(sig_cnt),num_eps_arr(eps_cnt))
+            fprintf('Value from mean_rg: %g\t, rgavg_vals: %g\n', mean_rg(eps_cnt,sig_cnt),rgavg_vals(eps_cnt,sig_cnt));
+            error('ERROR: Some problem in computing averages from two methods: See Sec: Compute Mean and Std Dev\n');
+        end
     end
 end
 
@@ -85,7 +108,7 @@ end
 h_avgrg = figure;
 hold on
 box on
-set(gca,'FontSize',16)
+set(gca,'FontSize',18)
 xlabel('$\Sigma$','FontSize',20,'Interpreter','Latex')
 ylabel('$R_g/R_{g0}$','FontSize',20,'Interpreter','Latex')
 xlim([0.0 0.02+max(num_sigma_arr)]);
@@ -94,7 +117,8 @@ for eps_cnt = 1:length(num_eps_arr)
         pclr{eps_cnt},'Marker',msty{eps_cnt},'LineStyle',':')
     legendinfo{eps_cnt} = ['$\epsilon_{pg}$: ' num2str(num_eps_arr(eps_cnt))];
 end
-legend(legendinfo,'Interpreter','Latex','FontSize',20,'Location','best')
+legend(legendinfo,'Interpreter','Latex','FontSize',14,'Location','best')
+legend boxoff
 saveas(h_avgrg,sprintf('./../../all_figures/fig_avgrg_bbMW_%d_gMW_%d_nch_%d.png',...
     bb_mw,gr_mw,num_bb_chains))
 
@@ -106,7 +130,7 @@ clear legendinfo eps_cnt sig_cnt;
 h_rgwitherr = figure;
 hold on
 box on
-set(gca,'FontSize',16)
+set(gca,'FontSize',18)
 xlabel('$\Sigma$','FontSize',20,'Interpreter','Latex')
 ylabel('$R_g$','FontSize',20,'Interpreter','Latex')
 xlim([0.0 0.02+max(num_sigma_arr)]);
@@ -114,9 +138,10 @@ for eps_cnt = 1:length(num_eps_arr)
     errorbar(num_sigma_arr,mean_rg(eps_cnt,:),stddev_rg(eps_cnt,:),...
         'Color',pclr{eps_cnt},'MarkerSize',12,'MarkerFaceColor',...
         pclr{eps_cnt},'Marker',msty{eps_cnt},'LineStyle',':')
-    legendinfo{eps_cnt} = ['$\epsilon_{pg}$: ' num2str(num_eps_arr(eps_cnt))];
+    legendinfo{eps_cnt} = ['$\epsilon_{gg}$: ' num2str(num_eps_arr(eps_cnt))];
 end
-legend(legendinfo,'Interpreter','Latex','FontSize',20,'Location','best')
+legend(legendinfo,'Interpreter','Latex','FontSize',14,'Location','best')
+legend boxoff
 saveas(h_rgwitherr,sprintf('./../../all_figures/fig_avgrgwitherr_bbMW_%d_gMW_%d_nch_%d.png',...
     bb_mw,gr_mw,num_bb_chains))
 
@@ -127,17 +152,18 @@ clear legendinfo eps_cnt sig_cnt;
 h_rgbyrg0witherr = figure;
 hold on
 box on
-set(gca,'FontSize',16)
+set(gca,'FontSize',18)
 xlabel('$\Sigma$','FontSize',20,'Interpreter','Latex')
 ylabel('$R_g/R_{\rm{g0}}$','FontSize',20,'Interpreter','Latex')
 xlim([0.0 0.02+max(num_sigma_arr)]);
 for eps_cnt = 1:length(num_eps_arr)
-    errorbar(num_sigma_arr,mean_rg(eps_cnt,:)/rg0,stddev_rg(eps_cnt,:)./rgstdev,...
+    errorbar(num_sigma_arr,mean_rg(eps_cnt,:)/rg0,normstddev(eps_cnt,:),...
         'Color',pclr{eps_cnt},'MarkerSize',12,'MarkerFaceColor',...
         pclr{eps_cnt},'Marker',msty{eps_cnt},'LineStyle',':')
-    legendinfo{eps_cnt} = ['$\epsilon_{pg}$: ' num2str(num_eps_arr(eps_cnt))];
+    legendinfo{eps_cnt} = ['$\epsilon_{gg}$: ' num2str(num_eps_arr(eps_cnt))];
 end
-legend(legendinfo,'Interpreter','Latex','FontSize',20,'Location','best')
+legend(legendinfo,'Interpreter','Latex','FontSize',14,'Location','best')
+legend boxoff
 saveas(h_rgbyrg0witherr,sprintf('./../../all_figures/fig_avgrgbyrg0witherr_bbMW_%d_gMW_%d_nch_%d.png',...
     bb_mw,gr_mw,num_bb_chains))
 

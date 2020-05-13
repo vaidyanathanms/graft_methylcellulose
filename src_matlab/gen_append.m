@@ -11,14 +11,14 @@ format long;
 %% Input Flags
 
 rgflag    = [0,1,5,1]; %[flagid,columns_to_process-XY,num_headerlines];
-shapeflag = [1,1]; %[flag,headerlines]
-dcomflag  = [0,1]; %[flag,headerlines]
+shapeflag = [0,1];     %[flag,headerlines]
+dcomflag  = [1,1];     %[flag,headerlines]
 persflag  = [0,1,3,1]; %[flag,columns_to_process-XY,num_headerlines];
 
 %% Input Data
 
-num_bb_chains = 1;
-polydens      = '0.5';
+num_bb_chains = 2;
+polydens      = '0.1';
 eps_arr       = {'0.8';'1.0';'1.2'};
 sigma_arr     = {'0.0','0.01','0.05','0.1','0.15','0.2','0.25','0.3'};
 mw_graft_arr  = [25];
@@ -31,6 +31,7 @@ src_folder   = pwd;
 for conf_cnt = 1:length(config_arr)
     
     config = config_arr(conf_cnt);
+    fprintf('Configuration under analysis: %d\n', config);
     
     for bb_cnt = 1:length(mw_bb_arr) % backbone MW loop
         
@@ -58,11 +59,12 @@ for conf_cnt = 1:length(config_arr)
                     
                     if rgflag(1,1) %% Find all files for rgflag
                         
+                        fprintf('Analyzing Rg values \n')
                         rg_prefix = sprintf('rgavgall_%s_%s_%d_*.dat',eps_arr{eps_cnt},...
                             sigma_arr{sig_cnt},bb_mw);
                         rg_fylelist = dir(strcat(simdirname,'/',rg_prefix));
-                        if size(rg_fylelist) == 0
-                            fprintf('No files are found for %s\n',rg_prefix);
+                        if min(size(rg_fylelist)) == 0
+                            fprintf('No files/Empty files are found for %s\n',rg_prefix);
                             break;
                         end
                         
@@ -74,17 +76,27 @@ for conf_cnt = 1:length(config_arr)
                         
                     end %end rgflag
                     
-                    distcomfile = -1;
-                    if dcomflag(1,1) %%if distcom files are present
-                        
-                        distcomfile = 1;
+                    
+                    %If distcom - can be either from distcom* (new) or compos* files (old) 
+                    distcomfile = 1;
+                    if dcomflag(1,1) %Begin distCOM calculations
+                        fprintf('Analyzing distance between COM \n');
                         com_prefix = sprintf('distcom_%s_%s_%d_*.dat',eps_arr{eps_cnt},...
                             sigma_arr{sig_cnt},bb_mw);
                         com_fylelist = dir(strcat(simdirname,'/',com_prefix));
-                        if size(com_fylelist) == 0
-                            fprintf('No files are found for %s\n',com_prefix);
-                            break;
+                        if min(size(com_fylelist)) == 0
+                            fprintf('No files/Empty files are found for %s\n',com_prefix);
+                            distcomfile = -1;
                         end
+                    end
+                     
+                    % Process distcom files (new)
+                    if dcomflag(1,1) && distcomfile == 1 %COM calculation (with distcom files)
+                        
+                        fprintf('Using distcom* files \n');
+                        com_prefix = sprintf('distcom_%s_%s_%d_*.dat',eps_arr{eps_cnt},...
+                            sigma_arr{sig_cnt},bb_mw);
+                        com_fylelist = dir(strcat(simdirname,'/',com_prefix));
                         
                         outfname = sprintf('composallappend_%s_%s_%d.dat',eps_arr{eps_cnt},...
                             sigma_arr{sig_cnt},bb_mw);
@@ -94,13 +106,15 @@ for conf_cnt = 1:length(config_arr)
                         
                     end %end distCOM calculation
                     
+                    %Process composfiles (old)
                     if dcomflag(1,1) && distcomfile == -1 %COM calculation (compute iff distcom is not present)
                         
+                        fprintf('Using compos* files\n');
                         com_prefix = sprintf('compos_%s_%s_%d_*.dat',eps_arr{eps_cnt},...
                             sigma_arr{sig_cnt},bb_mw);
                         com_fylelist = dir(strcat(simdirname,'/',com_prefix));
-                        if size(com_fylelist) == 0
-                            fprintf('No files are found for %s\n',com_prefix);
+                        if min(size(com_fylelist)) == 0
+                            fprintf('No files/Empty files are found for %s\n',com_prefix);
                             break;
                         end
                         
@@ -114,12 +128,13 @@ for conf_cnt = 1:length(config_arr)
                     
                     if shapeflag(1,1) %Shape factor calculation
                         
+                        fprintf('Analyzing eigenvalues\n')
                         shape_prefix = sprintf('eigMCavg_%s_%s_%d_*.dat',eps_arr{eps_cnt},...
                             sigma_arr{sig_cnt},bb_mw);
                         shape_fylelist = dir(strcat(simdirname,'/',shape_prefix));
                         
-                        if size(shape_fylelist) == 0
-                            fprintf('No files are found for %s\n',shape_prefix);
+                        if min(size(shape_fylelist)) == 0
+                            fprintf('No files/Empty files are found for %s\n',shape_prefix);
                             break;
                         end
                         outfname = sprintf('shapeallappend_%s_%s_%d.dat',eps_arr{eps_cnt},...
@@ -132,12 +147,13 @@ for conf_cnt = 1:length(config_arr)
                     
                     if persflag(1,1) %begin persistence length calculation
                         
+                        fprintf('Analyzing persistence length\n')
                         pers_prefix = sprintf('mainpersistautocf_%s_%s_%d_*.dat',eps_arr{eps_cnt},...
                             sigma_arr{sig_cnt},bb_mw);
                         pers_fylelist = dir(strcat(simdirname,'/',pers_prefix));
                         
-                        if size(pers_fylelist) == 0
-                            fprintf('No files are found for %s\n',pers_prefix);
+                        if min(size(pers_fylelist)) == 0
+                            fprintf('No files/Empty files are found for %s\n',pers_prefix);
                             break;
                         end
                         

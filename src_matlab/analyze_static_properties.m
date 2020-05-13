@@ -9,31 +9,39 @@ format long;
 
 rgflag   = [0,0,1,2];%[write,plot,XY-analysis_column]
 persflag = [0,0,1,2];%[write,plot,XY-analysis_column]
-comflag  = [0,0,1,5];%[write,plot,XY-analysis_column]
-shapeflag = [1,0];%[write,plot]
+comflag  = [0,1,1,5];%[write,plot,XY-analysis_column]
+shapeflag = [0,0];%[write,plot]
 
 %% Input Data
 
-num_bb_chains = 1;
-polydens      = '0.5';
+num_bb_chains = 2;
+polydens      = '0.1';
 eps_arr       = {'0.8','1.0','1.2'};
 sigma_arr     = {'0.01','0.05','0.1','0.15','0.2','0.25','0.3'};
 mw_graft_arr  = [25];
 mw_bb_arr     = [1000];
-config_arr    = [1,2,4,5]; % Only for plotting
-rg_bare       = 10.0; %mean Rg of bare systems - no graft
-err_rg_bare   = 1.0; %std dev for bare systems
+config_arr    = [1,2,4,5]; 
 
+%% Bare chain(s) results
+rg_bare       = 9.78; %mean Rg of bare systems - no graft
+err_rg_bare   = 0.25; %Reporting SEM; std dev = 0.60 for bare systems
+dcom_bare     = 3.61193;
+err_dcom_bare = 0.59; %Reporting SEM; std dev = 1.69109 for bare systems
 
+%% Cut-off data
 cutoff       = 0.1; %cutoff for persistence length
-tcut_frac    = 0.8; %cutoff time fraction to start calculating dcomavg
-tcut_prop_avg = 10^7; %cutoff timestep beyond which avg values are computed
+tcut_frac    = 0.5; %cutoff time fraction to start calculating dcomavg
+
+mincut = 3*10^7; %cutoff timestep beyond which avg values are computed
+maxcut = 7*10^7; %maximum timestep over which averages are computed
 
 %% Main analysis - Write consolidated data
 
 for conf_cnt = 1:length(config_arr) %config loop (replicate trials)
+    
     config = config_arr(conf_cnt);
-
+    fprintf('Configuration under analysis: %d\n', config);
+    
     for bb_cnt = 1:length(mw_bb_arr) %backbone MW loop
         bb_mw  = mw_bb_arr(bb_cnt);
     
@@ -44,7 +52,7 @@ for conf_cnt = 1:length(config_arr) %config loop (replicate trials)
             if rgflag(1,1)
                 fw_rg = fopen(sprintf('../../outfiles/config_%d/rgavg_bbMW_%d_gMW_%d_nch_%d.dat',...
                     config,bb_mw,gr_mw,num_bb_chains),'w');
-                fprintf(fw_rg,'%s\t%s\t%s\t%s%d\n','epsilon','sigma','Avg_rg','tcut_off: ',tcut_prop_avg);
+                fprintf(fw_rg,'%s\t%s\t%s\t%s\t%s\n','epsilon','sigma','Avg_rg','cutoff_min_step','cutoff_max_step');
             end
             
             if persflag(1,1)
@@ -58,15 +66,14 @@ for conf_cnt = 1:length(config_arr) %config loop (replicate trials)
             if comflag(1,1)
                 fw_com = fopen(sprintf('../../outfiles/config_%d/distcomavg_bbMW_%d_gMW_%d_nch_%d.dat',...
                     config,bb_mw,gr_mw,num_bb_chains),'w');
-                fprintf(fw_com,'%s\t%s\t%s\t%s\t%s\n','sigma','epsilon',...
-                    'cutoff_time','mean_COM','stddev_COM');
+                fprintf(fw_com,'%s\t%s\t%s\t%s\t%s\t%s\n','sigma','epsilon','mean_COM','stddev_COM','cutoff_min_step','cutoff_max_step');
             end
             
             if shapeflag(1,1)
                 fw_shape = fopen(sprintf('../../outfiles/config_%d/shapefac_bbMW_%d_gMW_%d_nch_%d.dat',...
                     config,bb_mw,gr_mw,num_bb_chains),'w');
                 
-                fprintf(fw_shape,'%s\t %s%d%s\t','sigma','epsilon (Cutoff_Time: ',tcut_prop_avg,')');
+                fprintf(fw_shape,'%s\t %s%d%s\t','sigma','epsilon (Cutoff_Time: ',mincut,')');
                 for chcnt = 1:num_bb_chains
                     rg_str   = sprintf('%s%d','avg_rg: ',chcnt);
                     sph_str  = sprintf('%s%d','avg_sphericity: ',chcnt);
@@ -117,11 +124,13 @@ for conf_cnt = 1:length(config_arr) %config loop (replicate trials)
                             xcol = rgflag(1,3); ycol = rgflag(1,4);
                             rgunsrtdata = [rg_allvals.data(:,xcol) rg_allvals.data(:,ycol)];
                             sortrg = sortrows(rgunsrtdata,1); %to account for the fact that the data maybe jumbled
-                            lenrg  = length(sortrg(:,1));
-                            cutoffind = find_general_cutoff_index(sortrg(:,1),tcut_prop_avg);
-                            rg_avg = mean(sortrg(cutoffind:lenrg,2));
-                            fprintf(fw_rg,'%g\t%g\t%g\n',eps_val,sig_val,rg_avg);
-                            clear xcol ycol
+                            lenrg  = length(sortrg(:,1));                            
+                            
+                            [mincutoff,maxcutoff] = find_general_cutoff_minmax(sortrg(:,1),mincut,maxcut);
+                             
+                            rg_avg = mean(sortrg(mincutoff:maxcutoff,2));
+                            fprintf(fw_rg,'%g\t%g\t%g\t%g\t%g\n',eps_val,sig_val,rg_avg,sortrg(mincutoff,1),sortrg(maxcutoff,1));
+                            clear xcol ycol mincutoff maxcutoff
                         end
                         clear rg_fylename
                     end % End of rg calculation
@@ -179,13 +188,13 @@ for conf_cnt = 1:length(config_arr) %config loop (replicate trials)
                             com_allvals_srted = sortrows(com_allvals_unsrt,xcol);
                             
                             lfyle = length(com_allvals_srted(:,1));
-                            tcut_index = floor(tcut_frac*lfyle);
+                            [tcut_min, tcut_max] = find_general_cutoff_minmax(com_allvals_srted(:,1),mincut,maxcut);
                             
-                            dcom_mean = mean(com_allvals_srted(tcut_index:lfyle,2));
-                            dcom_std  = std(com_allvals_srted(tcut_index:lfyle,2));
-                            fprintf(fw_com,'%g\t%g\t%g\t%g\t%g\n',sig_val,eps_val,...
-                                com_allvals.data(tcut_index,xcol),dcom_mean,dcom_std);
-                            clear xcol ycol tcut_index com_allvals_srted com_allvals_unsrt com_allvals
+                            dcom_mean = mean(com_allvals_srted(tcut_min:lfyle,2));
+                            dcom_std  = std(com_allvals_srted(tcut_min:lfyle,2));
+                            fprintf(fw_com,'%g\t%g\t%g\t%g\t%g\t%g\n',sig_val,eps_val,dcom_mean,dcom_std,...
+                                com_allvals_srted(tcut_min,1),com_allvals_srted(tcut_max,1));
+                            clear xcol ycol tcut_index com_allvals_srted com_allvals_unsrt com_allvals tcut_min tcut_max
                         end
                         clear com_fylename
                     end %End com calculation
@@ -211,7 +220,7 @@ for conf_cnt = 1:length(config_arr) %config loop (replicate trials)
                             shapesrt = sortrows(shapeunsrt,1);
                             
                             lenkappa   = length(shapesrt(:,1));
-                            tcut_index = find_general_cutoff_index(shapesrt(:,1),tcut_prop_avg);
+                            tcut_min = find_general_cutoff_index(shapesrt(:,1),mincut);
                             avg_rg     = zeros(num_bb_chains,1);
                             avg_sphere = zeros(num_bb_chains,1);
                             avg_cylndr = zeros(num_bb_chains,1);
@@ -219,7 +228,7 @@ for conf_cnt = 1:length(config_arr) %config loop (replicate trials)
                             avg_prolate = zeros(num_bb_chains,1);
                             ncntr = zeros(num_bb_chains,1);
                             
-                            for cntr = tcut_index:lfyle
+                            for cntr = tcut_min:lfyle
                                 chid = shapesrt(cntr,2);
                                 avg_rg(chid,1) = avg_rg(chid,1) + shapesrt(cntr,4);
                                 avg_sphere(chid,1) = avg_sphere(chid,1) + shapesrt(cntr,5);
@@ -293,17 +302,15 @@ for bb_cnt = 1:length(mw_bb_arr) %backbone MW loop
         %% Begin COM plots
         if comflag(1,2) 
             
-            com_plot(config_arr,num_eps_arr,num_sigma_arr,bb_mw,gr_mw,num_bb_chains)
-            
+            com_plot(config_arr,num_eps_arr,num_sigma_arr,bb_mw,gr_mw,num_bb_chains,dcom_bare,err_dcom_bare)            
             
         end %End of com plots
         
         %% Begin shape factor plots
+        % Assumes the following file format: sigma, eps, avg_rg, avg_sphericity, avg_cylind, avg_shape, avg_prolateness
         if shapeflag(1,2)
-            
-            plotflag = [0,0,1]; % flags for asphericity, acylindricity, shapefac
-            %shape_plot(config_arr,num_eps_arr,num_sigma_arr,bb_mw,gr_mw,num_bb_chains,plotflag)
-            %% Plot average shape factor/asph/acyl
+                   
+            shape_plot(config_arr,num_eps_arr,num_sigma_arr,bb_mw,gr_mw,num_bb_chains,plotflag)
                 
         end %End of shape plots
             
