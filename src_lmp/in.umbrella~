@@ -1,0 +1,59 @@
+#####################################################
+# Stage 2: Umbrella Simulations                     #
+# Version: May-13-2019                               #
+#####################################################
+
+
+# Initialization
+log 		log.smd
+units		lj
+boundary	p p p
+atom_style      molecular
+bond_style      harmonic
+angle_style     harmonic
+dihedral_style  harmonic
+improper_style  none
+pair_style      lj96/cut 3.0
+
+#Data read and Pair initialize
+read_data	smdinp.data
+include         in.cgpair_MC
+pair_modify     shift yes mix geometric
+special_bonds   lj 0 0 0
+
+# Neighbor information
+neighbor        1.0 bin
+neigh_modify	every 1 delay 0 check yes one 10000
+thermo_style    custom step temp press
+thermo          2000
+
+# Define groups
+group backbone_atoms type 1:8
+group graft_atoms type 9
+group ref_bb id 1:1000
+group pull_bb id 1001:2000
+group smdgroup union ref_bb pull_bb
+
+# Initiate/Write Atoms and Other Details
+variable        ts equal step
+variable        tconst equal 200*dt
+timestep        0.0003
+shell "rm -f out.colvars.*"
+dump            main all custom 2000 umbconfig_${ts}.lammpstrj id type xu yu zu
+
+#####################################################
+# Begin Umbrella Sampling
+#####################################################
+
+# Main Fixes
+fix  nvtrun   all nvt temp 1.0 1.0 ${tconst}
+fix  umbcol   all colvars umbcolfile output colout
+fix  tether ref_bb spring/self 5.0
+
+# Run styles
+restart   5000    smd_restart1 smd_restart2
+restart   1000000 smdarchival.*_restart
+run	  10000000
+unfix nvtrun
+unfix umbcol
+unfix tether

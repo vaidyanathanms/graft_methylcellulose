@@ -1,0 +1,10 @@
+                 # Pair Coefficients for semiflexible chains
+ 
+ # Pair_Coeffs
+pair_coeff * *       1.0       1.0       1.12246204831
+ 
+ # Bond_Coeffs
+bond_coeff *  500.00000000   1.00000000
+ 
+ # Angle_Coeffs
+angle_coeff *   15.00000000 165.00000000

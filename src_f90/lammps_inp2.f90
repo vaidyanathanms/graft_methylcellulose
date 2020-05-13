@@ -1,0 +1,1590 @@
+!-----To generate input parameters for LAMMPS CG-MethylCellulose-----
+!----- Parameter File: lmp_params.f90--------------------------------
+!------Version: Feb-07-2019------------------------------------------
+!--------------------------------------------------------------------
+
+PROGRAM LAMMPSINP
+
+  USE PARAMS
+
+  IMPLICIT NONE
+  
+  INTEGER :: ierror,narg
+
+  CALL SYSTEM_CLOCK(S)
+  CALL READ_PARAMETERS()
+  CALL COMPUTE_TOTAL_PARTICLES()
+  CALL COMPUTE_BOX()
+  CALL ALLOCATE_ARRAYS()
+  CALL WRITE_GENERATE_FILE_MAIN()
+  CALL DEALLOCATE_ARRAYS()
+  CALL CLOSE_FILES()
+
+  PRINT *, "Successfully generated input configuration .."
+
+END PROGRAM LAMMPSINP
+
+!--------------------------------------------------------------------
+
+SUBROUTINE READ_PARAMETERS()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  INTEGER :: AllocateStatus, logflag, nargs, ierror,ierr
+
+  nargs = IARGC()
+  IF(nargs .NE. 1) STOP "Input incorrect"
+
+  logflag = 0
+
+  CALL GETARG(nargs,ana_fname)
+
+  OPEN(unit = anaread,file=trim(ana_fname),action="read",status="old"&
+       &,iostat=ierr)
+  
+  IF(ierr /= 0) THEN
+
+     PRINT *, trim(ana_fname), "not found"
+     STOP
+
+  END IF
+
+  DO
+
+     READ(anaread,*,iostat=ierr) dumchar
+
+     IF(ierr .LT. 0) EXIT
+
+     IF(dumchar == 'datafile') THEN
+        
+        READ(anaread,*,iostat=ierr) datafile
+
+     ELSEIF(dumchar == 'graft_style') THEN
+
+        READ(anaread,*,iostat=ierr) grafts
+
+        IF (grafts == 0) THEN
+           
+           numatomtypes = 1 !arbitrary
+
+        ELSEIF (grafts == 1 .OR. grafts == 2) THEN
+
+           numatomtypes = 9
+
+        ELSEIF (grafts == 3) THEN
+
+           numatomtypes = 2
+
+        END IF
+
+     ELSEIF(dumchar == 'numatomtypes') THEN
+
+        IF(grafts == 1 .OR. grafts == 2) THEN
+
+           PRINT *, "Option mismatch"
+           STOP
+
+        END IF
+
+        READ(anaread,*,iostat=ierr) numatomtypes
+
+     ELSEIF(dumchar == 'topotypes') THEN
+
+        READ(anaread,*,iostat=ierr) numbondtypes,numangltypes&
+             &,numdihdtypes
+        
+     ELSEIF(dumchar == 'nchains') THEN
+
+        READ(anaread,*,iostat=ierr) N
+
+     ELSEIF(dumchar == 'nmonomers') THEN
+
+        READ(anaread,*,iostat=ierr) M
+
+     ELSEIF(dumchar == 'deg_sub') THEN
+
+        READ(anaread,*,iostat=ierr) DS_MC
+
+     ELSEIF(dumchar == 'graftperchain') THEN
+
+        READ(anaread,*,iostat=ierr) perc_graft_per_chain
+        ngraft_per_bb = INT(M*perc_graft_per_chain)
+        IF(perc_graft_per_chain == 0.0) numatomtypes = numatomtypes-1
+
+     ELSEIF(dumchar == 'polywtperc') THEN
+
+        READ(anaread,*,iostat=ierr) polywtperc
+
+     ELSEIF(dumchar == 'ngraft_mons') THEN
+        
+        READ(anaread,*,iostat=ierr) ngraft_mons
+
+     ELSEIF(dumchar == 'init_dist') THEN
+
+        READ(anaread,*,iostat=ierr) init_com_dist
+
+        IF(init_com_dist .LE. 0.0) THEN
+           PRINT *, "Input value > 0.0 for COM dist"
+           STOP
+        END IF
+
+     ELSEIF(dumchar == 'logfile') THEN
+        
+        READ(anaread,*,iostat=ierr) log_fname
+        logflag = 1
+
+     ELSEIF(dumchar == 'bondcalc') THEN
+
+        READ(anaread,*,iostat=ierr) bondcalc
+
+     ELSEIF(dumchar == 'density') THEN
+
+        READ(anaread,*,iostat=ierr) density
+
+     ELSE
+
+        PRINT *, "Unknown keyword", dumchar
+        STOP
+
+     END IF
+        
+
+  END DO
+
+  IF(logflag == 0) log_fname = "lmp_log.txt"
+  OPEN (unit = logfile, file = trim(adjustl(log_fname)), status ="repl&
+       &ace",action="write",iostat=ierror)
+  IF(ierror /= 0) STOP "Cannot open logfile"
+  
+  ALLOCATE(cntatomtype(1:numatomtypes),stat = AllocateStatus)
+  IF(AllocateStatus/=0) STOP "did not allocate cntatomtype"
+  
+  ALLOCATE(mass_arr(1:numatomtypes),stat = AllocateStatus)
+  IF(AllocateStatus/=0) STOP "did not allocate mass_arr"
+
+     
+  
+END SUBROUTINE READ_PARAMETERS
+
+!--------------------------------------------------------------------
+
+SUBROUTINE WRITE_GENERATE_FILE_MAIN()
+
+  USE PARAMS
+  
+  IMPLICIT NONE
+  
+  INTEGER :: i
+  REAL :: ranval, massval
+
+  CALL WRITE_INIT_DETAILS()
+  CALL CREATE_BASIC_ATTYPES()
+  IF(grafts == 1 .OR. grafts == 2)  CALL CREATE_ATYPE()
+  IF(grafts == 1) CALL CREATE_ATYPE_DEF()
+  CALL BASIC_FILE_INFO()
+
+  CALL INPCOR_POLY()
+  IF(grafts == 2 .OR. grafts == 3) CALL INPCOR_GRAFTS()
+  IF(nsolvent /= 0) CALL INPCOR_SOLVENT()
+
+
+  CALL COMPUTE_IMAGES()
+  CALL WRITE_ATOM_INFO()
+  CALL WRITE_TOPO_INFO()
+
+  IF(bondcalc == 1) CALL BOND_LEN()
+  
+END SUBROUTINE WRITE_GENERATE_FILE_MAIN
+
+!--------------------------------------------------------------------
+
+SUBROUTINE COMPUTE_TOTAL_PARTICLES()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  IF(N==0 .OR. M==0) THEN
+
+     IF(grafts /= -1) THEN
+        WRITE(logfile,*) "ERROR:Number of backbone chains/monomers uni&
+             &nitialized"
+        PRINT *, "ERROR:Number of backbone chains/monomers uninitializ&
+             &ed"
+        STOP
+     
+     END IF
+
+  END IF
+
+  IF(grafts == 0) THEN !No graft case
+     total_poly = N*M
+     nsolvent = REAL(total_poly)/REAL(polywtperc)-REAL(total_poly)
+     totpart = N*M + nsolvent
+  ELSEIF(grafts == 1) THEN !Grafts as substituted backbone
+     total_poly = N*M
+     nsolvent = REAL(total_poly)/REAL(polywtperc)-REAL(total_poly)
+     totpart = N*M + nsolvent
+  ELSEIF(grafts == 2) THEN !Grafts along backbone of MC
+     total_poly = N*M + INT(N*ngraft_per_bb*ngraft_mons)
+     nsolvent = 0
+     totpart = total_poly
+  ELSEIF(grafts ==3) THEN !Explicit solvent case
+     total_poly = N*M + INT(N*ngraft_per_bb*ngraft_mons)
+     nsolvent = REAL(total_poly)/REAL(polywtperc)-REAL(total_poly)
+     totpart = N*M + N*ngraft_per_bb*ngraft_mons + nsolvent
+  ELSEIF(grafts == -1) THEN  ! Only solvent
+     total_poly = 0
+  ELSE
+     PRINT *, "Unknown graft identifier"
+     STOP
+  END IF
+
+  IF(nsolvent /= 0) numatomtypes = numatomtypes + 1
+
+
+END SUBROUTINE COMPUTE_TOTAL_PARTICLES
+
+!--------------------------------------------------------------------
+
+SUBROUTINE COMPUTE_BOX()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  REAL :: total_mass
+  REAL, PARAMETER :: nm2sigma = 0.515
+  REAL, PARAMETER :: avogadro = 6.023
+  REAL, PARAMETER :: unit_mass = 180.103 !average molar mass of MC
+
+  IF(grafts == 2) THEN
+     total_mass = N*M*unit_mass/avogadro
+  ELSE
+     total_mass = total_poly + nsolvent
+  END IF
+
+  volbox = total_mass/density
+  
+  boxl_x = (volbox**(1.0/3.0))/nm2sigma
+  boxl_y = (volbox**(1.0/3.0))/nm2sigma
+  boxl_z = (volbox**(1.0/3.0))/nm2sigma
+
+  insidebox = boxl_x*0.5
+
+END SUBROUTINE COMPUTE_BOX
+
+!--------------------------------------------------------------------
+
+SUBROUTINE BASIC_FILE_INFO()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  INTEGER :: ierror, i
+  REAL :: massval
+
+20 FORMAT(5X,I0,2X,A)
+22 FORMAT(5X,I0,2X,A)
+24 FORMAT(5X,I0,2X,F14.6,2X,A)
+  
+  !Open file
+
+  OPEN (unit=outfile, file = datafile, status="replace",action=&
+       &"write",iostat = ierror)
+  
+  IF(ierror /= 0) STOP "Failed to open datafile"
+
+  !Header data
+     
+  WRITE (outfile,*) "Data for CG simulations"
+  WRITE (outfile,*) 
+
+  !Atom and topology data
+
+  WRITE (outfile,20) totpart, "atoms"
+
+  IF(grafts == 0 .OR. grafts == 1) THEN
+     WRITE (outfile,20) N*(M-1), "bonds"
+     numbondtypes = 1
+  ELSEIF(grafts == 2 .OR. grafts == 3) THEN
+     WRITE (outfile,20) N*(M-1) + N*(ngraft_mons)*ngraft_per_bb&
+          &,"bonds"
+     numbondtypes = 2
+  ELSEIF(grafts == -1) THEN
+     WRITE (outfile,20) 0, "bonds"
+  END IF
+
+
+  IF(perc_graft_per_chain == 0.0) numbondtypes = numbondtypes-1
+
+  IF(numangltypes /= 0) THEN
+     WRITE (outfile,20) N*(M-2), "angles"
+  ELSE
+     WRITE (outfile,20) 0, "angles"
+  END IF
+
+  IF(numdihdtypes /= 0) THEN
+     WRITE (outfile,20) N*(M-3), "dihedrals"
+  ELSE
+     WRITE (outfile,20) 0, "dihedrals"
+  END IF
+
+  WRITE (outfile,20) 0, "impropers"
+  
+  !Atomtype and topotype data
+
+  WRITE (outfile,20) numatomtypes, "atom types"
+  WRITE (outfile,20) numbondtypes, "bond types"
+  WRITE (outfile,22) numangltypes, "angle types"
+  WRITE (outfile,22) numdihdtypes, "dihedral types"
+  WRITE (outfile,22) 0, "improper types"
+
+  !Box data
+
+  WRITE (outfile,*)
+  WRITE (outfile,24) 0, boxl_x, "xlo xhi"
+  WRITE (outfile,24) 0, boxl_y, "ylo yhi"
+  WRITE (outfile,24) 0, boxl_z, "zlo zhi"
+
+  ! Mass data
+
+  WRITE (outfile,*)
+  WRITE (outfile,*) "Masses"
+  WRITE (outfile,*)
+
+  DO i = 1,numatomtypes
+
+     CALL WRITE_MASS(i,massval)
+     WRITE(outfile,'(I0,1X,F14.8)') i, massval
+     mass_arr(i) = massval
+
+  END DO
+
+END SUBROUTINE BASIC_FILE_INFO
+
+!---------------------------------------------------------------------
+
+SUBROUTINE COMPUTE_IMAGES()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  INTEGER :: i,j,k
+  INTEGER :: kchain, gp, bb_mon_pos,graftedpoint
+  REAL :: rx, ry, rz
+ 
+  im_xyz(1,1) = 0
+  im_xyz(1,2) = 0
+  im_xyz(1,3) = 0
+  
+  DO i = 1,N
+     
+     im_xyz(i,1) = 0
+     im_xyz(i,2) = 0
+     im_xyz(i,3) = 0
+     
+     DO j = 1,M-1
+        
+        k = (j-1)*3
+        rx = rxyz(i,k+1) - rxyz(i,k+4)
+        ry = rxyz(i,k+2) - rxyz(i,k+5)
+        rz = rxyz(i,k+3) - rxyz(i,k+6)
+        
+        im_xyz(i,k+4) = IMGFLAGS(rx,im_xyz(i,k+1),boxl_x)
+        im_xyz(i,k+5) = IMGFLAGS(ry,im_xyz(i,k+2),boxl_y)
+        im_xyz(i,k+6) = IMGFLAGS(rz,im_xyz(i,k+3),boxl_z)
+        
+     END DO
+     
+  END DO
+
+  IF(grafts == 2 .OR. grafts == 3) THEN
+
+! Image information for grafts
+       
+     DO i = 1,N ! For each chain
+        
+        DO j = 1,ngraft_per_bb ! First graft monomer
+           
+           k            = 3*((j-1)*ngraft_mons)
+           graftedpoint = graftmonvals(i,j)
+           !Find position along chain-- varies between 1 and M
+           IF(mod(graftedpoint,M) == 0) THEN 
+              bb_mon_pos = M 
+           ELSE
+              bb_mon_pos   = mod(graftedpoint,M)
+           END IF
+           kchain       = 3*(bb_mon_pos-1)
+
+           rx = rxyz(i,kchain+1) - rgrafts(i,k+1)
+           ry = rxyz(i,kchain+2) - rgrafts(i,k+2)
+           rz = rxyz(i,kchain+3) - rgrafts(i,k+3)
+
+           im_xyzgraft(i,k+1) = IMGFLAGS(rx,im_xyz(i,kchain+1),boxl_x)
+           im_xyzgraft(i,k+2) = IMGFLAGS(ry,im_xyz(i,kchain+2),boxl_y)
+           im_xyzgraft(i,k+3) = IMGFLAGS(rz,im_xyz(i,kchain+3),boxl_z)
+
+           DO gp = 1,ngraft_mons-1
+             
+              rx = rgrafts(i,k+1) - rgrafts(i,k+4)
+              ry = rgrafts(i,k+2) - rgrafts(i,k+5)
+              rz = rgrafts(i,k+3) - rgrafts(i,k+6)
+              
+              im_xyzgraft(i,k+4) = IMGFLAGS(rx,im_xyzgraft(i,k+1),boxl_x)
+              im_xyzgraft(i,k+5) = IMGFLAGS(ry,im_xyzgraft(i,k+2),boxl_y)
+              im_xyzgraft(i,k+6) = IMGFLAGS(rz,im_xyzgraft(i,k+3),boxl_z)
+
+              k = k + 3
+              
+           END DO
+           
+        END DO
+        
+     END DO
+
+  END IF
+
+CONTAINS
+  
+  INTEGER FUNCTION IMGFLAGS(dist, img,boxl)
+    
+    USE PARAMS
+    
+    IMPLICIT NONE
+    
+    REAL, INTENT(IN) :: dist,boxl
+    INTEGER, INTENT(IN) :: img
+    INTEGER :: nx
+    
+    IF(dist > boxl/2) THEN
+       
+       nx = img + 1
+       
+    ELSEIF(dist < -boxl/2) THEN
+       
+       nx = img - 1
+       
+    ELSE
+       
+       nx = img
+       
+    END IF
+    
+    IMGFLAGS = nx
+    
+  END FUNCTION IMGFLAGS
+
+
+END SUBROUTINE COMPUTE_IMAGES
+
+!---------------------------------------------------------------------
+
+SUBROUTINE WRITE_MASS(atin, massval)
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  INTEGER, INTENT(IN) :: atin
+  REAL, INTENT(OUT)   :: massval
+  INTEGER :: DSmon
+
+  IF (grafts == 1 .OR. grafts == 2) THEN
+
+     IF(atin == 1) THEN
+
+        DSmon = 0
+           
+     ELSEIF(atin .LE. 4) THEN
+        
+        DSmon = 1
+        
+     ELSEIF(atin .LE. 7) THEN
+        
+        DSmon = 2
+        
+     ELSEIF(atin == 8) THEN
+        
+        DSmon = 3
+        
+     ELSEIF(atin == 9) THEN
+        
+        DSmon = 1.5
+        
+     END IF
+     
+     IF(atin == 9 .AND. grafts == 2) THEN
+        
+        massval = 44.05/162.1406
+        
+     ELSE
+     
+        massval = (12.0106*(6+DSmon)+15.9994*5+1.008*(10-2.0*DSmon))&
+             &/162.1406
+     
+     END IF
+
+  ELSEIF(grafts == 3) THEN
+
+     IF(atin == 1) THEN
+
+        massval = 1.0
+
+     ELSE
+
+        massval = mass_gr2bb
+
+     END IF
+
+  ELSE
+
+     massval = 1.0
+
+  END IF
+  
+END SUBROUTINE WRITE_MASS
+
+!--------------------------------------------------------------------
+
+SUBROUTINE WRITE_ATOM_INFO()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  INTEGER :: i,j,k
+  INTEGER :: atomid,atyp_graft,gp,atyp_solv
+  REAL :: rx, ry, rz
+  
+  ! Writing atomic corrdinates
+  
+  WRITE (outfile,*) 
+  WRITE (outfile,*) "Atoms"
+  WRITE (outfile,*)
+
+
+  !Backbone Info
+  atomid = 0
+  DO i = 1,N
+     
+     DO j = 1,M
+        
+        k = (j-1)*3
+        atomid = atomid + 1
+
+        rx = rxyz(i,k+1) + boxl_x*im_xyz(i,k+1)
+        ry = rxyz(i,k+2) + boxl_y*im_xyz(i,k+2)
+        rz = rxyz(i,k+3) + boxl_z*im_xyz(i,k+3)
+
+        WRITE(outfile,'(3(I0,1X),3(F14.6,1X),3(I0,1X))') atomid, i,&
+             & atype(i,j), rxyz(i,k+1), rxyz(i,k+2), rxyz(i,k+3),im_xyz(i&
+             &,k+1), im_xyz(i,k+2), im_xyz(i,k+3)
+        
+     END DO
+     
+  END DO
+
+  !Graft Info
+  IF(grafts == 2 .OR. grafts == 3) THEN
+     
+     atyp_graft = atype(1,1)
+
+     DO i = 1,N
+
+        DO j = 1,M
+           
+           IF(atype(i,j) .GT. atyp_graft) atyp_graft = atype(i,j)
+
+        END DO
+        
+     END DO
+
+     atyp_graft = atyp_graft + 1
+
+     DO i = 1,N
+     
+        DO j = 1,ngraft_per_bb !Graft monomer
+           
+           k = 3*((j-1)*ngraft_mons)
+                    
+           DO gp = 1,ngraft_mons
+              
+              atomid = atomid + 1
+              
+              WRITE(outfile,'(3(I0,1X),3(F14.6,1X),3(I0,1X))') atomid&
+                   &, i,atyp_graft, rgrafts(i,k+1), rgrafts(i,k+2),&
+                   & rgrafts(i,k+3), im_xyzgraft(i,k+1), im_xyzgraft(i,k+2),&
+                   & im_xyzgraft(i,k+3)
+              
+              k = k + 3
+   
+           END DO
+           
+        END DO
+        
+     END DO
+
+  END IF
+
+  !Solvent Info
+  IF(nsolvent /= 0) THEN
+
+     IF(grafts == 0 .OR. grafts == 1) THEN
+        atyp_solv = MAXVAL(atype) + 1
+     ELSE
+        atyp_solv = atyp_graft + 1
+     END IF
+
+     DO i = 1,nsolvent
+              
+        atomid = atomid + 1
+              
+        WRITE(outfile,'(3(I0,1X),3(F14.6,1X),3(I0,1X))') atomid&
+             &, N+i,atyp_solv, rsolvent(i,1), rsolvent(i,2),&
+             & rsolvent(i,3), 0, 0, 0
+        
+     END DO
+     
+  END IF
+
+
+END SUBROUTINE WRITE_ATOM_INFO
+
+!---------------------------------------------------------------------
+
+
+SUBROUTINE WRITE_TOPO_INFO()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  INTEGER :: i,j,k
+  INTEGER :: atomid, bondid, anglid, dihdid
+  INTEGER :: bondtype, angltype, dihdtype
+  INTEGER :: ch_id, gr_id, gp
+
+  IF(numbondtypes /= 0) THEN
+
+     ! Writing Bond Details  
+     
+     bondid = 0
+     atomid = 0
+     bondtype = 1
+
+     WRITE (outfile,*)
+     WRITE (outfile,*) "Bonds"
+     WRITE (outfile,*)
+     
+     DO i = 1,N
+        
+        DO j = 1,M-1
+           
+           bondid = bondid + 1
+           atomid = atomid + 1
+           
+           WRITE(outfile,'(4(I0,2X))') bondid, bondtype, atomid,&
+                & atomid+1
+           
+        END DO
+        
+        atomid = atomid + 1
+        
+     END DO
+     
+     IF(grafts == 2 .OR. grafts == 3) THEN
+
+        DO i = 1,N
+
+           DO j = 1,ngraft_per_bb !graft_chains_first_monomer
+              
+              bondid = bondid + 1
+              
+              ch_id = graftmonvals(i,j)
+              gr_id = (i-1)*ngraft_mons*ngraft_per_bb + (j-1)&
+                   &*ngraft_mons+1 + N*M
+
+              WRITE(outfile,'(4(I0,2X))') bondid, bondtype+1,ch_id&
+                   &,gr_id
+              
+              atomid = gr_id
+              
+              DO gp = 2,ngraft_mons
+                 
+                 bondid = bondid + 1
+                 WRITE(outfile,'(4(I0,2X))') bondid, bondtype+1&
+                      &,atomid,atomid+1
+
+                 atomid = atomid + 1
+                 
+              END DO
+              
+           END DO
+           
+        END DO
+        
+     END IF
+     
+  END IF
+
+  IF(numangltypes /= 0) THEN
+
+     ! Writing Angle Details
+
+     angltype = 1
+     anglid = 0
+     atomid = 0
+     WRITE (outfile,*)
+     WRITE (outfile,*) "Angles"
+     WRITE (outfile,*)
+     
+     DO i = 1,N
+        
+        DO j = 1,M-2
+           
+           anglid = anglid + 1
+           atomid = atomid + 1
+           
+           WRITE(outfile,'(5(I0,2X))') anglid, angltype, atomid,&
+                & atomid+1, atomid+2
+           
+        END DO
+        
+        atomid = atomid + 2
+        
+     END DO
+     
+  END IF
+  
+  IF(numdihdtypes /= 0) THEN
+     
+     ! Writing Dihedral Details
+     
+     dihdtype = 1
+     dihdid = 0
+     atomid = 0
+     WRITE (outfile,*)
+     WRITE (outfile,*) "Dihedrals"
+     WRITE (outfile,*)
+     
+     DO i = 1,N
+        
+        DO j = 1,M-3
+           
+           dihdid = dihdid + 1
+           atomid = atomid + 1
+           
+           WRITE(outfile,'(6(I0,2X))') dihdid, dihdtype, atomid,&
+                & atomid+1,atomid+2,atomid+3
+           
+        END DO
+        
+        atomid = atomid + 3
+        
+     END DO
+     
+  END IF
+
+END SUBROUTINE WRITE_TOPO_INFO
+
+!----------------------------------------------------------------------
+
+SUBROUTINE CREATE_BASIC_ATTYPES()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  INTEGER :: i,j
+
+  DO i = 1,N
+
+     DO j = 1,M
+
+        atype(i,j) = 1
+
+     END DO
+     
+  END DO
+  
+END SUBROUTINE CREATE_BASIC_ATTYPES
+
+!---------------------------------------------------------------------
+
+SUBROUTINE CREATE_ATYPE()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  INTEGER :: i,j
+  INTEGER, DIMENSION(1:N,1:M) :: dstype
+  REAL :: dssum, err, rannum, ranval
+
+  IF(init_rannum == -1) THEN
+     CALL RAN_INIT(S,X)
+     init_rannum = 1
+  END IF
+
+  dstype = -1
+  
+  ! Create DS for each monomer
+  
+  DO i = 1,N
+     
+     err = 9999
+     
+     PRINT *, "Generating sequence for chain ", i
+     
+     DO WHILE(err .GT. mean_tol)
+        
+        dssum = 0.0
+        j = 1
+        
+        DO WHILE(j .LE. M)
+           
+           dstype(i,j) = ANINT(DS_fac*DS_MC*RAN1(X))
+           dssum = dssum + REAL(dstype(i,j))
+
+           IF(j == M .AND. dstype(i,j) == 4) CYCLE
+           
+           IF(dstype(i,j) .GT. 4 .OR. dstype(i,j) .LT. 0) CYCLE
+           
+           IF(dstype(i,j) .GT. 4 .OR. dstype(i,j) .LT. 0) THEN
+              
+              PRINT *, "Wrong dstype", i,j, dstype(i,j)
+              STOP
+              
+           END IF
+           
+           !IF DS = 4, split into two monomers. Possible combinations
+           ! are {(3,1),(1,3),(2,2)}
+           
+           IF(dstype(i,j) == 4) THEN
+                 
+              ranval = ran1(X)
+              
+              IF(ranval .LE. 0.33333) THEN
+                 
+                 dstype(i,j) = 2
+                 dstype(i,j+1) = 2
+                 
+              ELSEIF(ranval .LE. 0.66666) THEN
+                 
+                 dstype(i,j) = 1
+                 dstype(i,j+1) = 3
+                 
+              ELSE
+                 
+                 dstype(i,j) = 3
+                 dstype(i,j+1) = 1
+                 
+              END IF
+                 
+              j = j + 2
+                 
+           ELSE
+                 
+              j = j + 1
+              
+           END IF
+              
+        END DO
+           
+        dssum = dssum/REAL(M)
+        err = abs(dssum-DS_mc)
+
+     END DO
+        
+     WRITE(logfile,*) "DS of Chain ", i, "is", dssum
+        
+  END DO
+
+  ! Create Atype
+  
+  cntatomtype = 0
+  
+  DO i = 1,N
+     
+     DO j = 1,M
+        
+        IF(dstype(i,j) == 0) THEN 
+           
+           atype(i,j) = 1
+           cntatomtype(1) = cntatomtype(1)+1
+           
+        ELSEIF(dstype(i,j) == 3) THEN
+           
+           atype(i,j) = 8
+           cntatomtype(8) = cntatomtype(8)+1
+           
+        ELSEIF(dstype(i,j) == 1) THEN
+           
+           rannum = RAN1(X)
+           
+           IF(rannum .LE. 1.0/3.0) THEN
+              
+              atype(i,j) = 2
+              cntatomtype(2) = cntatomtype(2)+1
+              
+           ELSEIF(rannum .LE. 2.0/3.0) THEN
+              
+              atype(i,j) = 3
+              cntatomtype(3) = cntatomtype(3)+1
+              
+           ELSE
+              
+              atype(i,j) = 4
+              cntatomtype(4) = cntatomtype(4)+1
+              
+           END IF
+           
+        ELSEIF(dstype(i,j) == 2) THEN
+           
+           rannum = RAN1(X)
+           
+           IF(rannum .LE. 1.0/3.0) THEN
+              
+              atype(i,j) = 5
+              cntatomtype(5) = cntatomtype(5)+1
+              
+           ELSEIF(rannum .LE. 2.0/3.0) THEN
+              
+              atype(i,j) = 6
+              cntatomtype(6) = cntatomtype(6)+1
+              
+           ELSE
+              
+              atype(i,j) = 7
+              cntatomtype(7) = cntatomtype(7)+1
+              
+           END IF
+           
+        ELSE
+              
+           PRINT *, "Unknown DS value", i, j, dstype(i,j)
+           
+        END IF
+        
+     END DO
+     
+  END DO
+  
+  WRITE(logfile,*) "Statistics for different atomtypes"
+  
+  DO i = 1,numatomtypes
+     
+     WRITE(logfile,*) "Number of atomtypes of type", i, "is",&
+          & cntatomtype(i)
+     
+  END DO
+  
+  WRITE(logfile,*) "Statistics"
+  
+  DO i = 1,N
+     
+     cntatomtype = 0
+     WRITE(logfile,*) "Chain: ", i
+     
+     DO j = 1,M
+        
+        cntatomtype(atype(i,j)) = cntatomtype(atype(i,j)) + 1
+        
+     END DO
+     
+     DO j = 1,numatomtypes
+        
+        WRITE(logfile,*) "Natomtypes of Type ", j, ": ",&
+             & cntatomtype(j)
+        
+     END DO
+     
+  END DO
+  
+END SUBROUTINE CREATE_ATYPE
+
+!--------------------------------------------------------------------
+
+SUBROUTINE CREATE_ATYPE_DEF()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  INTEGER :: i,j,k,monval
+  REAL, DIMENSION(1:ngraft_per_bb) :: dsnewval
+  REAL :: dstot
+
+  !To make one of the monomers neutral to interactions with the other
+  !monomers of MC
+
+  DO j = 1,N
+
+     i = 1
+     
+     DO WHILE(i .LE. ngraft_per_bb)
+
+        monval = 1+INT(RAN1(X)*M)
+
+        IF(atype(j,monval) .NE. 9) THEN
+           
+           atype(j,monval) = 9
+           i = i + 1
+
+        END IF
+
+     END DO
+
+  END DO
+
+  DO i = 1,N
+
+     dstot = 0.0
+
+     DO j = 1,M
+
+        k = (i-1)*M + j
+        
+        IF(atype(i,j) == 1) THEN
+           
+           dstot = dstot + 0.0
+           
+        ELSEIF(atype(i,j) .LE. 4) THEN
+           
+           dstot = dstot + 1.0
+           
+        ELSEIF(atype(i,j) .LE. 7) THEN
+           
+           dstot = dstot + 2.0
+           
+        ELSEIF(atype(i,j) == 8) THEN
+           
+           dstot = dstot + 3.0
+           
+        ELSEIF(atype(i,j) == 9) THEN
+           
+           dstot = dstot + 0.0 !INT(3.0*RAN1(X))
+           
+        ELSE
+           
+           PRINT *, "Unknown atype", i,j
+
+        END IF
+
+     END DO
+
+     WRITE(logfile,*) "Revised DS of chain  " , i, " is: ", dstot&
+          &/REAL(M)
+     
+  END DO
+
+     
+END SUBROUTINE CREATE_ATYPE_DEF
+
+!--------------------------------------------------------------------
+
+
+SUBROUTINE INPCOR_POLY()
+  
+  USE PARAMS
+  IMPLICIT NONE
+  
+  INTEGER :: i,j,k,u,v,ierror,ccnt,comflag
+  REAL :: theta, phi,rcntdist
+  REAL :: rx2ij,ry2ij,rz2ij,ri2j,rxe2e,rye2e,rze2e,re2e
+  REAL :: x1com,y1com,z1com
+  REAL :: x2com,y2com,z2com
+  REAL :: tot_mass1, tot_mass2
+  
+  IF (init_rannum == -1) THEN
+     CALL RAN_INIT(S,X)
+     init_rannum = 1
+  END IF
+  
+  
+  i = 1
+
+  WRITE(logfile,*)
+  WRITE(logfile,*) "Theta/Phi Details"
+  
+  DO WHILE(i <= N)
+     
+     k = 1
+
+     rxyz(i,k)   = insidebox + (RAN1(X)-0.50)*insidebox
+     rxyz(i,k+1) = insidebox + (RAN1(X)-0.50)*insidebox
+     rxyz(i,k+2) = insidebox + (RAN1(X)-0.50)*insidebox
+     
+     k = k + 3
+     
+     theta       = math_pi*RAN1(X)
+     phi         = 2*math_pi*RAN1(X)
+     WRITE(logfile,*), i,"2",theta,phi
+     rxyz(i,k)   = rxyz(i,k-3) + r0init*sin(theta)*cos(phi)
+     rxyz(i,k+1) = rxyz(i,k-2) + r0init*sin(theta)*sin(phi)
+     rxyz(i,k+2) = rxyz(i,k-1) + r0init*cos(theta)
+     
+     k = k + 3
+     j = 3
+     WRITE(21,*), i,j,theta,phi
+
+     DO WHILE (j <= M)
+        
+        theta       = math_pi*RAN1(X)
+        phi         = 2*math_pi*RAN1(X)
+        rxyz(i,k)   = rxyz(i,k-3) + r0init*sin(theta)*cos(phi)
+        rxyz(i,k+1) = rxyz(i,k-2) + r0init*sin(theta)*sin(phi)
+        rxyz(i,k+2) = rxyz(i,k-1) + r0init*cos(theta)
+        
+        rx2ij = rxyz(i,k) - rxyz(i,k-6)
+        ry2ij = rxyz(i,k+1) - rxyz(i,k-5)
+        rz2ij = rxyz(i,k+2) - rxyz(i,k-4)
+        ri2j  = rx2ij**2 + ry2ij**2 + rz2ij**2
+        
+        IF(ri2j > 1.0404) THEN
+           
+           k = k + 3
+           j = j + 1
+           WRITE(logfile,*), i,j,theta,phi
+           
+        END IF
+        
+     END DO
+
+     k = (M-1)*3
+     rxe2e = rxyz(i,k+1) - rxyz(i,1)
+     rye2e = rxyz(i,k+2) - rxyz(i,2)
+     rze2e = rxyz(i,k+3) - rxyz(i,3)
+     
+     re2e = rxe2e**2 + rye2e**2 + rze2e**2
+
+     comflag = 1
+     IF(init_com_dist > 0.0 .AND. i > 1) THEN
+
+        comflag = -1
+        x1com = 0.0; y1com = 0.0; z1com = 0.0
+        x2com = 0.0; y2com = 0.0; z2com = 0.0
+        tot_mass1 = 0.0; tot_mass2 = 0.0
+
+        DO ccnt = 1,M
+           
+           k = (ccnt - 1)*3
+           x1com = x1com + rxyz(i,k+1)*mass_arr(atype(i,ccnt)) 
+           y1com = y1com + rxyz(i,k+2)*mass_arr(atype(i,ccnt))
+           z1com = z1com + rxyz(i,k+3)*mass_arr(atype(i,ccnt))
+           tot_mass1 = tot_mass1 + mass_arr(atype(i,ccnt))
+
+           x2com = x2com + rxyz(i-1,k+1)*mass_arr(atype(i-1,ccnt))
+           y2com = y2com + rxyz(i-1,k+2)*mass_arr(atype(i-1,ccnt))
+           z2com = z2com + rxyz(i-1,k+3)*mass_arr(atype(i-1,ccnt))
+           tot_mass2 = tot_mass2 + mass_arr(atype(i,ccnt))
+
+
+        END DO
+        
+        x1com = x1com/tot_mass1; x2com = x2com/tot_mass2
+        y1com = y1com/tot_mass1; y2com = y2com/tot_mass2
+        z1com = z1com/tot_mass1; z2com = z2com/tot_mass2
+
+        ri2j  = (x1com-x2com)**2 + (y1com-y2com)**2 + (z1com-z2com)**2
+        ri2j  = sqrt(ri2j)
+
+
+        IF(abs(init_com_dist-ri2j) < com_tol) THEN
+           
+           comflag = 1
+           WRITE(logfile,*) "Minimum distance input ", init_com_dist
+           WRITE(logfile,*) i, i-1, ri2j
+
+        END IF
+   
+     END IF
+     
+     IF(sqrt(re2e) .LT. 0.5*REAL(M)*r0init .AND. comflag == 1) THEN
+        !Maximum stretch possible is when ree = Mb
+        !So we can allow upto 50% of max stretch
+        !This condition needs to be checked if no of chains are
+        !very less
+        WRITE(logfile,*) "Chain ID ", "end to end dist sq ", " M*r0 "
+        WRITE(logfile,*) i, re2e,M*r0init
+        i = i + 1
+        
+        
+     END IF
+        
+  END DO
+     
+  ! PBC
+  
+  DO i = 1,N
+     
+     DO j = 1,M 
+        
+        k = (j-1)*3
+        
+        rxyz(i,k+1) = rxyz(i,k+1) - boxl_x*floor(rxyz(i,k+1)/boxl_x)
+        rxyz(i,k+2) = rxyz(i,k+2) - boxl_y*floor(rxyz(i,k+2)/boxl_y)
+        rxyz(i,k+3) = rxyz(i,k+3) - boxl_z*floor(rxyz(i,k+3)/boxl_z)
+        
+     END DO
+     
+  END DO
+  
+
+END SUBROUTINE INPCOR_POLY
+
+!---------------------------------------------------------------------
+
+SUBROUTINE INPCOR_GRAFTS()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  INTEGER :: i,j,k,monval,AllocateStatus,graftedpoint,gp
+  REAL :: dstot,phi,theta,ranval
+  INTEGER :: kchain,bb_mon_pos
+
+  agraftid = -1
+
+  OPEN(unit = 21, file="graft_bb_map.txt",action="write",status="repla&
+       &ce")
+
+  DO j = 1,N ! Chain loop
+
+     i = 1
+     
+     DO WHILE(i .LE. ngraft_per_bb)
+        
+        ranval = RAN1(X)
+        monval = 1+INT(ranval*M)
+        
+        IF(agraftid(j,monval) == -1) THEN
+           
+           agraftid(j,monval) = 1
+           graftmonvals(j,i) = monval + (j-1)*M
+           WRITE(21,'(4(I0,1X))') j,i,monval,graftmonvals(j,i)
+           i = i + 1
+
+        END IF
+
+     END DO
+
+  END DO
+
+
+  WRITE(logfile,*)
+  WRITE(logfile,*) "Generating random graft configuration ..."
+  WRITE(logfile,*) "Graft point IDs in backbone/graft"
+
+  
+  DO j = 1,N ! Chains loop
+
+     DO i = 1,ngraft_per_bb !graft_chains_first_monomer
+        
+        k            = 3*((i-1)*ngraft_mons) + 1
+        graftedpoint = graftmonvals(j,i)
+        !Find position along chain-- varies between 1 and M
+        IF(mod(graftedpoint,M) == 0) THEN 
+           bb_mon_pos = M 
+        ELSE
+           bb_mon_pos   = mod(graftedpoint,M)
+        END IF
+        kchain       = 3*(bb_mon_pos-1) + 1
+        phi          = 2*math_pi*RAN1(X)
+        theta        = math_pi*RAN1(X)
+
+        WRITE(logfile,*) i,graftmonvals(j,i),(i-1)*ngraft_mons+1+N*M&
+             &+(j-1)*ngraft_mons*ngraft_per_bb
+
+        rgrafts(j,k)   = rxyz(j,kchain) + r0init*sin(theta)*cos(phi)
+        rgrafts(j,k+1) = rxyz(j,kchain+1) + r0init*sin(theta)*sin(phi)
+        rgrafts(j,k+2) = rxyz(j,kchain+2) + r0init*cos(theta)
+        
+        DO gp = 2, ngraft_mons ! Graft loop 
+
+           k = k + 3
+           phi         = 2*math_pi*RAN1(X)
+           theta       = math_pi*RAN1(X)
+           rgrafts(j,k)   = rgrafts(j,k-3) +r0init*sin(theta)*cos(phi)
+           rgrafts(j,k+1) = rgrafts(j,k-2) +r0init*sin(theta)*sin(phi)
+           rgrafts(j,k+2) = rgrafts(j,k-1) +r0init*cos(theta)
+                      
+        END DO
+        
+     END DO
+     
+  END DO
+
+
+  !PBC 
+
+  DO j = 1,N ! Chains loop
+     
+     DO i = 1,ngraft_per_bb !graft_chains_first_monomer
+
+        k = 3*((i-1)*ngraft_mons)
+
+        DO gp = 1, ngraft_mons ! Graft loop 
+
+           rgrafts(j,k+1) = rgrafts(j,k+1) - boxl_x*FLOOR(rgrafts(j,k&
+                &+1)/boxl_x)
+           rgrafts(j,k+2) = rgrafts(j,k+2) - boxl_y*FLOOR(rgrafts(j,k&
+                &+2)/boxl_y)
+           rgrafts(j,k+3) = rgrafts(j,k+3) - boxl_z*FLOOR(rgrafts(j,k&
+                &+3)/boxl_z)
+
+           k = k + 3
+
+        END DO
+
+     END DO
+
+  END DO
+
+  
+END SUBROUTINE INPCOR_GRAFTS
+
+!--------------------------------------------------------------------
+
+SUBROUTINE INPCOR_SOLVENT()
+  
+  USE PARAMS
+  IMPLICIT NONE
+  
+  INTEGER :: i
+
+  DO i = 1,nsolvent
+     
+     rsolvent(i,1) = boxl_x*RAN1(X)
+     rsolvent(i,2) = boxl_y*RAN1(X)
+     rsolvent(i,3) = boxl_z*RAN1(X)
+
+  END DO
+  
+
+END SUBROUTINE INPCOR_SOLVENT
+
+!--------------------------------------------------------------------
+
+SUBROUTINE CLOSE_FILES()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  CLOSE(unit = outfile)
+  CLOSE(unit = logfile)
+
+END SUBROUTINE CLOSE_FILES
+
+!--------------------------------------------------------------------
+
+SUBROUTINE WRITE_INIT_DETAILS()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  WRITE(logfile,*) "------------System Details-----------------------"
+  WRITE(logfile,*)
+
+  IF(grafts == 0) THEN
+
+     WRITE(logfile,*) "No grafts are used"
+     
+  ELSEIF(grafts == 1) THEN
+
+     WRITE(logfile,*) "MC substituted grafts are used"
+
+  ELSEIF(grafts == 2) THEN
+
+     WRITE(logfile,*) "MC with side chain grafts are used"
+
+  ELSEIF(grafts == 3) THEN
+
+     WRITE(logfile,*) "Semiflexible with side chain grafts are used"
+
+  END IF
+
+  IF(nsolvent == 0) WRITE(logfile,*) "No solvent present"
+
+  WRITE(logfile,*)
+  WRITE(logfile,*) "-----------Backbone details---------------------"
+  WRITE(logfile,*) "Backbone chains/mon per chain: ", N , M
+  WRITE(logfile,*)
+  
+  IF(grafts /= 0) THEN
+
+     WRITE(logfile,*) "-----------Graft details--------------------"
+     WRITE(logfile,*)
+     WRITE(logfile,*) "Graft percentage: ", perc_graft_per_chain
+     WRITE(logfile,*) "Grafting Style: ", grafts
+     WRITE(logfile,*) "Graft chains backbone/mons per graft:",&
+          & ngraft_per_bb,ngraft_mons
+     WRITE(logfile,*) "Mass ratio of grafts: ", mass_gr2bb
+     WRITE(logfile,*)
+
+  END IF
+     
+  IF(nsolvent /= 0) THEN
+     WRITE(logfile,*) "-----------Solvent details-----------------"
+     WRITE(logfile,*)
+     WRITE(logfile,*) "Solvent percentage: ", REAL(nsolvent)&
+          &/REAL(nsolvent+total_poly)
+     WRITE(logfile,*) "Solvent particles: ", nsolvent
+     WRITE(logfile,*)
+  END IF
+     
+  WRITE(logfile,*) "-----------Box details------------------------"
+  
+  WRITE(logfile,*)
+  WRITE(logfile,*) "Total number of particles: ", totpart  
+  WRITE(logfile,*) "Box size: ", boxl_x, boxl_y, boxl_z
+  WRITE(logfile,*) "Density/Volume: ", density, volbox
+  WRITE(logfile,*) "Start of first monomer: ", insidebox
+
+  WRITE(logfile,*) "**********************************************"
+
+END SUBROUTINE WRITE_INIT_DETAILS
+
+!--------------------------------------------------------------------
+
+SUBROUTINE BOND_LEN()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  INTEGER :: i, j, k
+  REAL :: bondl, bondlsq
+  REAL :: rx, ry, rz
+  REAL :: end2end
+
+  bondlsq = 0
+!!$  PRINT *, "entered bondl loop "
+
+  OPEN (unit = 14, file = "bond_lammps.txt", status = "replace",&
+       & action= "write")
+
+  OPEN (unit = 15, file = "length_check.txt", status = "replace",&
+       & action= "write")
+
+
+  DO i = 1,N
+
+     bondlsq = 0.0
+     DO j = 1,M-1
+
+        k = (j-1)*3
+
+        rx = rxyz(i,k+1) - rxyz(i,k+4)
+        ry = rxyz(i,k+2) - rxyz(i,k+5)
+        rz = rxyz(i,k+3) - rxyz(i,k+6)
+
+        rx = rx - boxl_x*ANINT(rx/boxl_x)
+        ry = ry - boxl_y*ANINT(ry/boxl_y)
+        rz = rz - boxl_z*ANINT(rz/boxl_z)
+
+        bondl   = rx**2 + ry**2 + rz**2
+        bondlsq = bondlsq + bondl
+
+        WRITE(14,*) i, j, j+1, bondl
+
+     END DO
+
+     rx = rxyz(i,k+1) - rxyz(i,1)
+     ry = rxyz(i,k+2) - rxyz(i,2)
+     rz = rxyz(i,k+3) - rxyz(i,3)
+
+     rx = rx - boxl_x*ANINT(rx/boxl_x)
+     ry = ry - boxl_y*ANINT(ry/boxl_y)
+     rz = rz - boxl_z*ANINT(rz/boxl_z)
+
+     end2end = rx**2 + ry**2 + rz**2
+
+     WRITE(15,*) i, bondlsq
+
+  END DO
+
+  bondlsq = bondlsq/(N*(M-1))
+
+  CLOSE (unit = 14)
+  CLOSE (unit = 15)
+
+END SUBROUTINE BOND_LEN
+        
+!--------------------------------------------------------------------
+
+SUBROUTINE ALLOCATE_ARRAYS()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  INTEGER :: AllocateStatus
+
+! Allocate LAMMPS Structure
+
+  ALLOCATE(rxyz(1:N,1:3*M),stat = AllocateStatus)
+  IF(AllocateStatus/=0) STOP "did not allocate rxyz"
+  ALLOCATE(uxyz(1:N,1:3*M),stat = AllocateStatus)
+  IF(AllocateStatus/=0) STOP "did not allocate uxyz"
+  ALLOCATE(im_xyz(1:N,1:3*M),stat = AllocateStatus)
+  IF(AllocateStatus/=0) STOP "did not allocate im_xyz"
+  ALLOCATE(atype(1:N,1:M),stat = AllocateStatus)
+  IF(AllocateStatus/=0) STOP "did not allocate atype"
+
+  IF(grafts /= 0) THEN
+
+     ALLOCATE(rgrafts(1:N,1:3*ngraft_mons*ngraft_per_bb),Stat&
+          &=AllocateStatus)
+     IF(AllocateStatus/=0) STOP "did not allocate rgrafts"
+     ALLOCATE(im_xyzgraft(1:N,1:3*ngraft_mons*ngraft_per_bb),Stat&
+          &=AllocateStatus)
+     IF(AllocateStatus/=0) STOP "did not allocate im_xyzgraft"
+     ALLOCATE(agraftid(N,M),Stat=AllocateStatus)
+     IF(AllocateStatus/=0) STOP "did not allocate agraftid"
+     ALLOCATE(graftmonvals(N,1:ngraft_per_bb), Stat=AllocateStatus)
+     IF(AllocateStatus/=0) STOP "did not allocate graftmonvals"
+
+  ELSE
+
+     ALLOCATE(rgrafts(1,1),Stat=AllocateStatus)
+     DEALLOCATE(rgrafts)
+     ALLOCATE(im_xyzgraft(1,1),Stat=AllocateStatus)
+     DEALLOCATE(im_xyzgraft)
+     ALLOCATE(agraftid(1,1),Stat=AllocateStatus)
+     DEALLOCATE(agraftid)
+     ALLOCATE(graftmonvals(1,1),Stat=AllocateStatus)
+     DEALLOCATE(graftmonvals)
+
+  END IF
+
+  IF(nsolvent /= 0) THEN
+
+     ALLOCATE(rsolvent(1:nsolvent,1:3),Stat=AllocateStatus)
+     IF(AllocateStatus/=0) STOP "did not allocate rgrafts"
+     
+  ELSE
+
+     ALLOCATE(rsolvent(1:1,1:1),Stat=AllocateStatus)
+     DEALLOCATE(rsolvent)
+
+  END IF
+     
+END SUBROUTINE ALLOCATE_ARRAYS
+
+!--------------------------------------------------------------------
+
+SUBROUTINE DEALLOCATE_ARRAYS()
+
+  USE PARAMS
+  IMPLICIT NONE
+
+  DEALLOCATE(uxyz)
+  DEALLOCATE(rxyz)
+  DEALLOCATE(im_xyz)
+  DEALLOCATE(atype)
+
+  IF(grafts /= 0) THEN
+     DEALLOCATE(rgrafts)
+     DEALLOCATE(im_xyzgraft)
+     DEALLOCATE(agraftid)
+     DEALLOCATE(graftmonvals)
+  END IF
+
+  IF(nsolvent /= 0) DEALLOCATE(rsolvent)
+
+END SUBROUTINE DEALLOCATE_ARRAYS
+
+!--------------------------------------------------------------------

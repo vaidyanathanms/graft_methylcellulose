@@ -1,0 +1,15 @@
+                 # Pair Coefficients for semiflexible chains
+ 
+ # Pair_Coeffs
+pair_coeff 1 1       1.0       1.0       1.12246204831
+pair_coeff 2 2       1.0       1.0       1.12246204831
+pair_coeff 3 3       1.0       1.0       1.12246204831
+ 
+ # Bond_Coeffs
+bond_coeff *  500.00000000   1.00000000
+ 
+ # Angle_Coeffs
+angle_coeff *   15.00000000 165.00000000
+ 
+ # Dihedral_Coeffs
+dihedral_coeff * py_kphi 1 1

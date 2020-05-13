@@ -1,0 +1,78 @@
+#### LAMMPS input file for semiflexible simulations ###############
+#### Version : Apr-04-2019 ########################################
+#Stage1: Minimization and equilibration
+#---------------Run a few steps to completely equilibrate system--#
+
+log             log.single
+units           lj
+boundary        p p p
+atom_style      molecular
+bond_style      harmonic
+angle_style     harmonic
+dihedral_style  harmonic
+improper_style  none
+pair_style      lj96/cut 3.0
+
+#-------------------Data read and Pair initialize-------------------#
+
+read_data       py_data 
+include         in.cgpair_MC
+pair_modify     shift yes mix geometric
+special_bonds   lj 0 0 0
+
+#--------------------Initialize-------------------------------------#
+
+thermo_style    custom step time temp press etotal epair density
+thermo          2000
+neighbor        1.0 bin
+neigh_modify    every 1 delay 0 check yes
+
+#--------------------Variable Definitions---------------------------#
+
+variable ts equal step
+variable tconst equal 200*dt
+
+#--------------------Remove Overlaps--------------------------------#
+
+timestep 0.0005
+fix 1 all nve/limit 0.0001
+fix 2 all momentum 1000 linear 1 1 1
+dump 1 all custom 10000 dump_stage_${ts}.lammpstrj id type xu yu zu
+run 200000
+unfix 1
+unfix 2
+
+minimize 1.0e-4 1.0e-6 1000 10000
+write_data min.data
+
+#---------------Main Run- Short equilibration---------------------#
+
+timestep 0.0001
+velocity all create 1.0 29834732 rot yes dist gaussian mom yes
+fix 1 all nvt temp 0.1 1.0 1.0 
+fix 2 all momentum 100000 linear 1 1 1
+
+restart 5000 restart1 restart2
+restart 1000000 archive_initrestart.* 
+run 2000000
+unfix 1
+unfix 2
+
+#--------------Main Run - Long equilibration-----------------------#
+
+timestep 0.0003
+fix 1 all nvt temp 1.0 1.0 ${tconst}
+fix 2 all momentum 100000 linear 1 1 1
+restart 5000 restart1 restart2
+restart 1000000 archive_restart_eq.* 
+run 20000000
+
+#----------Write/unfix/delete -------------------------------------#
+
+write_restart run_equil.*
+write_data run_equil.data
+
+unfix 1
+unfix 2
+variable tconst delete
+variable ts delete

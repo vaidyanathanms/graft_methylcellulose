@@ -1,0 +1,21 @@
+                 # Pair Coefficients for CGMC simulations at      50.0000
+ 
+ # Pair_Coeffs
+pair_coeff 1 1       1.278034       1.198800       1.969500
+pair_coeff 2 2       2.093957       1.068700       1.747600
+pair_coeff 3 3       1.401241       1.289200       2.108200
+pair_coeff 4 4       2.247764       1.114400       1.830800
+pair_coeff 5 5       1.932788       1.300100       2.135900
+pair_coeff 6 6       2.088827       1.097500       1.803100
+pair_coeff 7 7       1.599606       1.317000       2.163700
+pair_coeff 8 8       1.566994       1.452100       2.385600
+pair_coeff 9 9       1.000000       0.803010       1.317787
+ 
+ # Bond_Coeffs
+bond_coeff *  500.00000000   1.00000000
+ 
+ # Angle_Coeffs
+angle_coeff *   15.00000000 165.00000000
+ 
+ # Dihedral_Coeffs
+dihedral_coeff *    2.00000000 1 1

@@ -1,0 +1,29 @@
+datafile
+py_datafyl
+trajectory_file
+py_trajfyl
+nframes
+py_numframes
+skipfr
+py_skipframes
+nchains
+py_ntotchains
+chain_at_types
+9
+1 2 3 4 5 6 7 8 9
+graft_type
+9
+nmonsbackbone
+py_backbonemons
+compute_rg
+1 1
+compute_sysrg
+10
+compute_eigvals
+1 1 1
+compute_perslen
+1 1
+log_file
+py_logname
+compute_com
+1
