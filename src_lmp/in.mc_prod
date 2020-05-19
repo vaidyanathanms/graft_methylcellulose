@@ -12,6 +12,10 @@ include         in.cgpair_MC
 special_bonds   lj 0 0 0
 pair_modify     shift yes mix geometric
 
+#-------Read pair coeff for eps_pg (Prof. IS suggestion-------------#
+
+include         in.cgpair_polygraft_MC #should be read after mix geometric
+
 #--------------------Output----------------------------------------#
 
 thermo_style    custom step time temp press

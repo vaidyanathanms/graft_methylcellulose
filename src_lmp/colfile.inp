@@ -1,0 +1,23 @@
+# Colvars Module for SMD simulations
+# Use this as a precursor to generate initial configurtations for US
+# Date: March-24-2018
+colvar {
+	name r
+	width 1.0
+	outputAppliedForce yes
+	distance {
+		 group1 {atomNumbersRange 1-1000}
+		 group2 {atomNumbersRange 1001-2000}
+		 }
+}
+
+harmonic {
+	 name harmony
+	 colvars r
+	 centers 2.0
+	 forceConstant 5.0
+	 targetCenters 20.0
+	 targetNumSteps 5000000
+	 outputCenters yes
+	 outputAccumulatedWork yes
+	 }	

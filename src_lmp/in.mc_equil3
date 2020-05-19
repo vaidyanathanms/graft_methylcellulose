@@ -12,6 +12,10 @@ include         in.cgpair_MC
 special_bonds   lj 0 0 0
 pair_modify     shift yes mix geometric
 
+#-------Read pair coeff for eps_pg (Prof. IS suggestion-------------#
+
+include         in.cgpair_polygraft_MC #should be read after mix geometric
+
 #--------------------Output----------------------------------------#
 
 thermo_style    custom step time temp press
@@ -26,7 +30,7 @@ variable tconst equal 200*dt
 
 #---------------Main Run begins here-------------------------------#
 
-timestep 0.0003
+timestep 0.0002
 fix 1 all nvt temp 1.0 1.0 ${tconst} 
 fix 2 all momentum 1000000 linear 1 1 1
 dump 1 all custom 2000 dump_stage_${ts}.lammpstrj id type xu yu zu

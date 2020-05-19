@@ -17,8 +17,12 @@ pair_style      lj96/cut 3.0
 
 read_data       datainp.data
 include         in.cgpair_MC
-pair_modify     shift yes mix geometric
+pair_modify     shift yes mix geometric 
 special_bonds   lj 0 0 0
+
+#-------Read pair coeff for eps_pg (Prof. IS suggestion-------------#
+
+include         in.cgpair_polygraft_MC #should be read after mix geometric
 
 #--------------------Initialize-------------------------------------#
 

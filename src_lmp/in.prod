@@ -1,7 +1,7 @@
 #### LAMMPS input file for CG simulations #########################
 #### LAMMPS input file for semiflexible simulations ###############
 #### Version : Feb-15-2019 ########################################
-#Stage2: Production ###############################################
+#Stage4: Production ###############################################
 
 log             log.single
 units           lj

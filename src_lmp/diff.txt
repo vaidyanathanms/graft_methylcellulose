@@ -1,0 +1,71 @@
+#### LAMMPS input file for semiflexible simulations ######### |	#### LAMMPS input file for CG simulations ###################
+#### Version : Feb-15-2019 ################################## |	#### MethylCellulose - Huang et.al, Macromolecules, 2016,49,1
+#Stage1: Minimization and equilibration			      |	#### Version : Nov-29-2017 ##################################
+							      >	#Stage1: Minimization
+#---------------Run a few steps to completely equilibrate sys	#---------------Run a few steps to completely equilibrate sys
+
+log             log.single					log             log.single
+units           lj						units           lj
+boundary        p p p						boundary        p p p
+atom_style      molecular					atom_style      molecular
+bond_style      harmonic					bond_style      harmonic
+angle_style     harmonic					angle_style     harmonic
+dihedral_style  harmonic					dihedral_style  harmonic
+improper_style  none						improper_style  none
+pair_style      lj96/cut 3.0					pair_style      lj96/cut 3.0
+							      <
+#-------------------Data read and Pair initialize------------ <
+							      <
+read_data       py_data 				      <
+include         in.pair					      <
+pair_modify     shift yes mix geometric			      <
+special_bonds   lj 0 0 0					special_bonds   lj 0 0 0
+							      >	pair_modify     shift yes mix geometric
+							      >	read_data       lmpdatafyl
+							      >	include         in.cgpair_MC
+
+#--------------------Initialize------------------------------	#--------------------Initialize------------------------------
+
+thermo_style    custom step temp press etotal epair density	thermo_style    custom step temp press etotal epair density
+thermo          2000						thermo          2000
+neighbor        1.0 bin						neighbor        1.0 bin
+neigh_modify    every 1 delay 0 check yes			neigh_modify    every 1 delay 0 check yes
+
+#--------------------Remove Overlaps-------------------------	#--------------------Remove Overlaps-------------------------
+timestep 0.0005							timestep 0.0005
+fix 1 all nve/limit 0.0001				      |	fix 1 all nve/limit 0.001
+fix 2 all momentum 1000 linear 1 1 1				fix 2 all momentum 1000 linear 1 1 1
+dump 1 all custom 10000 dump_stage1.lammpstrj id type xu yu z	dump 1 all custom 10000 dump_stage1.lammpstrj id type xu yu z
+run 200000						      |	run 100000
+unfix 1								unfix 1
+unfix 2								unfix 2
+							      |	write_data melt_min.data
+minimize 1.0e-4 1.0e-6 1000 10000			      <
+write_data min.data					      <
+
+#---------------Main Run begins here-------------------------	#---------------Main Run begins here-------------------------
+
+timestep 0.0003						      |	velocity all create 1.0 29834732 rot yes dist gaussian
+velocity all create 1.0 29834732 rot yes dist gaussian mom ye <
+fix 1 all nvt temp 0.1 1.0 1.0 				      <
+fix 2 all momentum 100000 linear 1 1 1			      <
+
+restart 5000 restart_eq1 restart_eq2			      |	fix 1 all nvt temp 0.1 1.0 1.0 
+restart 1000000 archive_initrestart.* 			      |	fix 2 all momentum 1000 linear 1 1 1
+run 2000000						      <
+
+restart 5000 restart_eq1 restart_eq2			      |	restart 5000 restart1_melt1 restart1_melt2
+restart 1000000 archive_restart.* 			      |	restart 100000 archive_restart.* 
+timestep 0.0005							timestep 0.0005
+run 20000000						      |	run 200000
+							      >
+							      >	write_restart run1_melt.*
+							      >	write_data run1_melt.data
+							      >
+							      >	run 100000
+
+write_restart run1.*					      |	write_restart run2_melt.*
+write_data run_equil.data				      |	write_data run2_melt.data
+							      >
+							      >	unfix 1
+							      >	unfix 2
