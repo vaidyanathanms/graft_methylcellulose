@@ -7,7 +7,6 @@ import subprocess
 import sys
 import glob
 
-
 #---------------Import Functions-----------------------------------
 
 from subprocess import call
@@ -17,22 +16,21 @@ from my_python_functions import find_recent_traj_file
 from my_python_functions import write_to_file
 from my_python_functions import my_cpy_generic
 from my_python_functions import find_recent_file
-from my_python_functions import make_tarfile
 
-#------------------Graft Style------------------------------------
+#------------------Input Options----------------------------------
 
-graftopt = 2 # FOR ALL GRAFTED MC - USE THIS
 # 0 - No grafts
 # 1 - Make PEG as MC substitute 
 # 2 - Grow side chains for MC
 # 3 - Grow side chains for semiflexible chains
 # 3.1 - Flexible back bone
 
-#------------------Input Options----------------------------------
-
+graftopt = 2
 wlccheck = 1 #valid only for graftopt = 3
 anglstyl = 'harmonic' #cosine or harmonic
-config   = 5 #configuration to copy
+config   = 2 #configuration to copy
+figflag  = 0 #for copying figure_files
+fylflag  = 1 #for copying analysis_files
 
 #-----------------Input Arrays------------------------------------
 
@@ -40,11 +38,11 @@ epsarr_gg   = [0.8,1.0,1.2]
 epsarr_ps   = [1.0,1.0,1.0]
 epsarr_sg   = [1.0,1.0,1.0]
 
-nchains     = 1 # Number of backbone chains
+nchains     = 2 # Number of backbone chains
 nmons       = [1000] # Number of backbone monomers
 graftMW     = 25  # number of graft monomers per graft
 polywtperc  = 1.0 # total polymer weight percentage
-polydens    = 0.5 # density of the system
+polydens    = 0.1 # density of the system
 
 #Graft percentage/chain
 #graftarr    = [0.0]
@@ -59,7 +57,9 @@ temp    = '50.0' # String Value
 #-----------------File List---------------------------------------
 
 #Give prefix for files to be copied followed by *
-fyl_list    = ['archive*','restart*','job*']
+fyl_list    = ['avgeival_*','compos_*','eigMCavg_*','indeig_*',\
+               'mainpersistautocf_*','rgall_*','rgavgall_*',\
+               'rgMConly_*','rgsys_*','distcom_*']
 figname     = 'dump_stage_*'
 
 #----------------Directory Settings-------------------------------
@@ -138,15 +138,16 @@ for bblen in range(len(nmons)): #Backbone length loop
         print(workdir_graft, " does not exist (graftMW dir)")
         continue
     
-    #Make restart files output directory
+    #Make analysis files output directory
 
-    out_dir = 'restart_'+'bbMW_' + str(nmons[bblen]) + \
-              '_ngMW_' + str(graftMW) + '_rho_'+\
-              str(polydens) + '_nch_' + str(nchains)
-    anafyl_dir = workdir_graft + '/' + out_dir 
-    if not os.path.isdir(anafyl_dir):
-        print("Creating restart backup directory:", anafyl_dir)
-        os.mkdir(anafyl_dir)
+    if fylflag == 1:
+        out_dir = 'out_'+'bbMW_' + str(nmons[bblen]) + \
+                  '_ngMW_' + str(graftMW) + '_rho_'+\
+                  str(polydens) + '_nch_' + str(nchains)
+        anafyl_dir = workdir_graft + '/' + out_dir 
+        if not os.path.isdir(anafyl_dir):
+            os.mkdir(anafyl_dir)
+
 
     for glen in range(len(graftarr)): #Graft loop
 
@@ -165,13 +166,6 @@ for bblen in range(len(nmons)): #Backbone length loop
             print(workdir1, " does not exist (grafts per bb)")
             continue
 
-        anafyl_dir_graft = anafyl_dir + '/graftperc_' + \
-                           str(graftarr[glen])
-        
-        if not os.path.isdir(anafyl_dir_graft):
-            os.mkdir(anafyl_dir_graft)
-
-
         for eps in range(len(epsarr_gg)): #eps_pg loop
             
             workdir3 = workdir1 + '/epsval_' + str(epsarr_gg[eps])
@@ -180,40 +174,87 @@ for bblen in range(len(nmons)): #Backbone length loop
                 print(workdir3, " does not exist")
                 continue
 
-
-            anafyl_dir_eps = anafyl_dir_graft + '/epsval_' + \
-                           str(epsarr_gg[eps])
-        
-            if not os.path.isdir(anafyl_dir_eps):
-                os.mkdir(anafyl_dir_eps)
+            #Make output directory for figure files if needed
+            if figflag == 1:
+                outfig_name = 'snapshots_'+'config_' + str(config)\
+                              + '_bbMW_' + str(nmons[bblen]) + \
+                              '_ngMW_' + str(graftMW) + '_rho_'+\
+                              str(polydens) + '_nch_' + str(nchains) \
+                              + '_sig_' + str(graftarr[glen]) + \
+                              '_eps_' + str(epsarr_gg[eps])
+ 
+                outfig_dir  = workdir_temp + '/allsnapshots'
+                if not os.path.isdir(outfig_dir):
+                    os.mkdir(outfig_dir)
+                
 
             #------All copying/manipulations--------------------------
+            if fylflag == 1:
 
-            for fylcnt in range(len(fyl_list)):
-
-                os.chdir(workdir3)
-                destdir = os.getcwd()
-                list_of_files = glob.glob(fyl_list[fylcnt])
-
-                if list_of_files == []:
-                    print("Did not find files of type", \
-                          fyl_list[fylcnt])
+                workdir4 = workdir3 + '/all_output_data'
+                if not os.path.isdir(workdir4):
+                    print(workdir4, " does not exist")
                     continue
 
-                print( "Copying files of type: ", fyl_list[fylcnt])
+                print("Copying output files from", workdir4)
+
+                for fylcnt in range(len(fyl_list)):
+
+                    os.chdir(workdir4)
+                    destdir = os.getcwd()
+                    list_of_files = glob.glob(fyl_list[fylcnt])
+
+                    #search in all_output_data
+                    if list_of_files == []:
+
+                        os.chdir(workdir3)
+                        destdir = workdir3
+                        list_of_files = glob.glob(fyl_list[fylcnt])
+
+                        #search in previous directory
+                        if list_of_files == []:
+                            print("Did not find files of type", \
+                                  fyl_list[fylcnt])
+                            continue
+
+                    print( "Copying files of type: ", fyl_list[fylcnt])
+
+                    for filenum in range(len(list_of_files)):
+
+                        fylname = list_of_files[filenum]
+                        outfyl  = fylname.split("_")[0]
+                        anafylname = outfyl + '_' + str(epsarr_gg[eps]) + '_' \
+                                     + str(graftarr[glen]) + '_' + \
+                                     str(nmons[bblen])  + '_' + \
+                                     str(filenum+1) + '.dat'
+
+                        my_cpy_generic(destdir,anafyl_dir,fylname,anafylname)
+
+
+            #Copy all figures if needed
+            if figflag == 1:
+
+                specfig_dir = outfig_dir + '/' + outfig_name
+                if not os.path.isdir(specfig_dir):
+                    os.mkdir(specfig_dir)
+
+                os.chdir(workdir3)
+                
+                #check if figure directory is present
+                fig_maindir = workdir3 + '/fig_files'
+                if not os.path.isdir(fig_maindir):
+                    print(fig_maindir, " does not exist")
+                    continue
+                else:
+                    os.chdir(fig_maindir)
+
+                list_of_files = glob.glob(figname)
+
+                if list_of_files == []:
+                    print("No figure files with ", figname, "in ", fig_maindir) 
 
                 for filenum in range(len(list_of_files)):
 
                     fylname = list_of_files[filenum]
-                    anafylname = fylname
-                    my_cpy_generic(destdir,anafyl_dir_eps,fylname,anafylname)
-
-
-    print("Creating restart tar for config", config)
-    os.chdir(workdir_graft)
-    output_tarname = 'restartfiles_config_' + str(config) + '.tar.gz'
-    make_tarfile(output_tarname, anafyl_dir)
-
-
-
+                    my_cpy_generic(fig_maindir,outfig_dir,fylname,fylname)
                 

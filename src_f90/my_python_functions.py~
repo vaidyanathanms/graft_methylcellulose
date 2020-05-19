@@ -8,7 +8,6 @@ import subprocess
 import sys
 import glob
 import re
-import tarfile
 
 def cpy_main_files(maindir,destdir,fylname):
 
@@ -504,7 +503,3 @@ def check_integer(inpval):
         isstr = 1
 
     return isstr
-
-def make_tarfile(fylename,source_dir):
-    with tarfile.open(fylename, "w:gz") as tar:
-        tar.add(source_dir, arcname=os.path.basename(source_dir))

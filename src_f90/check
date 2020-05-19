@@ -1,0 +1,1 @@
+alias idevgpu='qsub -I -X -l walltime=1:00:00,nodes=4:ppn=24:gpus=2'

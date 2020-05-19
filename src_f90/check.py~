@@ -1,0 +1,25 @@
+# To copy the resultant files for further analysis
+
+import numpy
+import os
+import shutil
+import subprocess
+import sys
+import glob
+
+iarr = [1,2,3,4,5,6]
+flag1 = 0
+flag2 = 1
+val = 1
+for ival in range(len(iarr)):
+    print(iarr[ival])
+
+    if flag1 == 0:
+        print("flag1 is false")
+        continue
+
+    if flag2 == 1:
+        val = val + 1
+        print("flag2 is true")
+        
+print(val)

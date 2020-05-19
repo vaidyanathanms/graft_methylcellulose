@@ -1,7 +1,5 @@
 # To generate initial configurations for semiflexible chains
-#!C: Version: V_Feb_14_2019
-# New version: V_Mar_21_2020 see #!C for major change in algorithm
-# New version looks for restart files rather than dump files
+# Version: V_Feb_14_2019
 
 import numpy
 import os
@@ -18,9 +16,7 @@ from my_python_functions import cpy_main_files
 from my_python_functions import generate_backup
 from my_python_functions import create_infile
 from my_python_functions import check_integer
-from resubmit import start_from_beginning
-from resubmit import run_long_equil_cycle
-from resubmit import run_production_cycle
+from resubmit import run_movie_cycle
 
 #------------------Input Options---------------------------------
 
@@ -32,9 +28,8 @@ from resubmit import run_production_cycle
 # 3.1 - Fredrickson's case (explicit/implicit solv)
 
 graftopt = 2 # see options above
-wlcchec  = 1 # only valid when graftopt = 3, simple WLC model
+wlccheck = 1 # only valid when graftopt = 3, simple WLC model
 mindump  = 20000000 # end point for equilibrium
-maxdump  = 80000000 # maximum dump time
 anglstyl = 'harmonic' # cosine or harmonic
 config   = 5 # Trial number
 if graftopt != 3:
@@ -48,15 +43,15 @@ epsval_pg  = 0 #
 
 #Interaction details
 
-epsarr_gg   = [0.8,1.0,1.2]#,1.0,1.2]  # graft-graft
-epsarr_sg   = [1.0,1.0,1.2]#,1.0,1.0]  # solvent-graft 
-epsarr_ps   = [1.0,1.0,1.2]#,1.0,1.0]  # polymer-solvent
+#epsarr_gg   = [1.2]#,1.0,1.2]  # graft-graft
+#epsarr_sg   = [1.0]#,1.0,1.0]  # solvent-graft 
+#epsarr_ps   = [1.0,1.0,1.0]  # polymer-solvent
 
-#epsarr_gg   = [1.0]#,1.2]#,1.2]  # graft-graft
-#epsarr_sg   = [1.0]#,1.0]#,1.0]  # solvent-graft
-#epsarr_ps   = [1.0]#,1.0]#,1.0]  # polymer-solvent
+epsarr_gg   = [0.8,1.0,1.2]  # graft-graft
+epsarr_sg   = [0.8,1.0,1.0]  # solvent-graft
+epsarr_ps   = [0.8,1.0,1.0]  # polymer-solvent
 rcut        = pow(2,1/6)
-#
+
 #Chain and initial configuration details
 nchains     = 1 # Number of backbone chains
 nmons       = [1000]#,500,1000,2000]#,1000,2000] # Number of backbone monomers
@@ -68,16 +63,15 @@ polydens    = 0.5 # overall density of polymers
 #Graft percentage/chain
 #graftarr    = [0.01,0.05,0.10,0.15,0.20,0.25,0.30] 
 #graftarr    = [0.20,0.25,0.30]
-graftarr    = [0.2]
-#graftarr     = [0.0]
+#graftarr    = [0.0]
+graftarr     = [0.0,0.01,0.03,0.05,0.10,0.15,0.20,0.25,0.30]
 #graftarr    = [0.0,0.25,0.30]#,0.03,0.05,0.10,0.15,0.25,0.30]
 #For methylcellulose only
 DS_MC   = '1.80' # String Value - only for methylcellulose
 temp    = '50.0' # String Value - for computing parameters for MC
 
 #dump and other filenames
-dumpname = 'dump_stage_*' # include the *
-restname = 'archive_*'    # include the *
+dumpname = 'dump_stage_*' #include the *
 
 #---------------Topology Info ------------------------------------
 
@@ -153,35 +147,42 @@ for bblen in range(len(nmons)): #Backbone length loop
     #Make number of monomers in backbone directory
     workdir_bb_main = workdir_main + '/n_bb_' + str(nmons[bblen])
     if not os.path.isdir(workdir_bb_main):
-        os.mkdir(workdir_bb_main)
+        print(workdir_bb_main," does not exist")
+        continue
 
     #Make temperature directory
     if int(graftopt) != 3:
         workdir_temp = workdir_bb_main + '/temp_' + temp
         if not os.path.isdir(workdir_temp):
-            os.mkdir(workdir_temp)
+            print(workdir_temp, " does not exist")
+            continue
     else:
         workdir_temp = workdir_bb_main
 
     #Make trial configuration directory
     workdir_config = workdir_temp + '/config_' + str(config)
     if not os.path.isdir(workdir_config):
-        os.mkdir(workdir_config)
+        print(workdir_config, " does not exist")
+        continue
 
     #Make number of chains directory
     workdir_chain = workdir_config + '/nchains_' + str(nchains)
     if not os.path.isdir(workdir_chain):
-        os.mkdir(workdir_chain)
+        print(workdir_chain, " does not exist")
+        continue
+
 
     #Make wt% directory
     workdir_bb  = workdir_chain + '/backbonewtperc_'+ str(polydens)
     if not os.path.isdir(workdir_bb):
-        os.mkdir(workdir_bb)
+        print(workdir_bb, " does not exist")
+        continue
 
     #Make graftMW directory
     workdir_graft = workdir_bb + '/n_graft_' + str(graftMW)
     if not os.path.isdir(workdir_graft):
-        os.mkdir(workdir_graft)
+        print(workdir_graft, " does not exist")
+        continue
 
     for glen in range(len(graftarr)): #Graft loop
 
@@ -198,7 +199,8 @@ for bblen in range(len(nmons)): #Backbone length loop
 #            continue
 
         if not os.path.isdir(workdir1):
-            os.mkdir(workdir1)
+            print(workdir1, " does not exist")
+            continue
 
 
         for eps in range(len(epsarr_gg)): #eps_pg loop
@@ -214,7 +216,8 @@ for bblen in range(len(nmons)): #Backbone length loop
             workdir3 = workdir1 + '/epsval_' + str(epsarr_gg[eps])
 
             if not os.path.isdir(workdir3):
-                os.mkdir(workdir3)
+                print(workdir3, " does not exist")
+                continue
 
             os.chdir(workdir3)
             destdir = os.getcwd()
@@ -226,85 +229,47 @@ for bblen in range(len(nmons)): #Backbone length loop
 
 
             if list_of_files == []:
-                begin_fresh = 1 #No files here to start with
-                print("No files found in: ", destdir)
-                print("Beginning new simulation")
-                start_from_beginning(maindir,srclmp,lmp_execdir,destdir,\
-                                     data_fname,temp,polywtperc,rcut,blist,\
-                                     alist,k_phi,wlccheck,anglstyl,nchains,\
-                                     polydens,graftMW,initcom,nmons[bblen],\
-                                     graftarr[glen],epsarr_gg[eps],graftopt,\
-                                     geninp_list,begin_fresh,key_eps_pg,\
-                                     epsval_pg)
-                
+                print("No files here: Check path")
+                continue
                 
             else:
-
-                restflag = 1 # restart file found = 1                
-                latest_restfyl = find_recent_file(destdir,restname)
-#!C:            trajflag = 1 # trajectory found=1
-#!C:            flagstr  = -1 # is a string = 1
-#!C:            latest_trajfyl = find_recent_file(destdir,
-#!C:                                               dumpname)
-
                 
-                #!C: dumpfile should be of type dump_stage_*
-                #restart file should be of type archive_*
-
-                # check whether archive files are present
-                if latest_restfyl == "nil": #!C: latest_trajfyl == "nil"
-                    restflag = -1 #!C: trajflag = -1
+                trajflag = 1 #trajectory found=1
+                flagstr  = -1 #is a string = 1
+                latest_trajfyl = find_recent_file(destdir,
+                                                  dumpname)
+                #dumpfile should be of type dump_stage_*
+                if latest_trajfyl == "nil":
+                    trajflag = -1
                 else:
-                    delimited_vals = re.split("\W+|_",latest_restfyl)
-                    #!C re.split("\W+|_",latest_trajfyl)
-                    timeval = delimited_vals[len(delimited_vals)-1] #!C: [len(delimited_vals)-2]
-                    #!C: check whether the dumpfile is dump_stage1.*
-                    #!C: flagstr = check_integer(timeval)
-                    #!C: if flagstr == 1:
-                    #!C:    print("Did not find matching dumpfile, restarting")
-                    #!C:    trajflag = -1
-                    if int(timeval) < 1000000: #!C: elif
+                    delimited_vals = re.split("\W+|_",latest_trajfyl)
+                    timeval = delimited_vals[len(delimited_vals)-2]
+                    #check whether the dumpfile is dump_stage1.*
+                    flagstr = check_integer(timeval)
+                    if flagstr == 1:
+                        print("Did not find matching dumpfile, restarting")
+                        trajflag = -1
+                    elif int(timeval) < 1000000:
                         print("Timestep less than 1000000, restarting")
-                        restflag = -1 #!C: trajflag = -1
+                        trajflag = -1
                     else:
                         print("Latest timestep: ", timeval)
 
 
-                if restflag == -1: #!C: trajflag == -1
+                if trajflag == -1:
 
-                    #Files already here needs to be deleted
-
-                    begin_fresh = -1 
+                    print("Not equilibrated: Run more")
                     
-#!C:                    if flagstr == -1:
-#!C:                        print("No trajectory file in")
-#!C:                    else:
-#!C:                        print("Stopped before 1 million steps")
-                    print("No restart files/ stopped before 1 million steps")
-                    print("Restarting simulation...")
-
-                    start_from_beginning(maindir,srclmp,lmp_execdir,destdir,\
-                                         data_fname,temp,polywtperc,rcut,blist,\
-                                         alist,k_phi,wlccheck,anglstyl,nchains,\
-                                         polydens,graftMW,initcom,nmons[bblen],\
-                                         graftarr[glen],epsarr_gg[eps],graftopt,\
-                                         geninp_list,begin_fresh,key_eps_pg,\
-                                         epsval_pg)
-                    
-                elif int(timeval) > maxdump:
-                    print("Maximum timestep reached")
-                    continue
-
                 elif int(timeval) > mindump:
-                    print("Running production cycle")
-                    run_production_cycle(maindir,destdir,srclmp,nmons[bblen],\
-                                         graftarr[glen],graftopt)
+                    print("Compiling movie files for: ",destdir)
+                    fig_dir = destdir + '/fig_files'
+                    if not os.path.isdir(fig_dir):
+                        os.mkdir(fig_dir)
+                    run_movie_cycle(maindir,destdir,srclmp,nmons[bblen],\
+                                   graftarr[glen],graftopt)
 
                 else:
-                    print("Running long equil+prod cycles for: ",destdir)
-                    run_long_equil_cycle(maindir,destdir,srclmp,nmons[bblen],\
-                                         graftarr[glen],graftopt)
-
+                    print("yet to run production cycle")
 
                 
 

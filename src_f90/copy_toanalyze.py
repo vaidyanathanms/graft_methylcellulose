@@ -28,24 +28,32 @@ from my_python_functions import find_recent_file
 graftopt = 2
 wlccheck = 1 #valid only for graftopt = 3
 anglstyl = 'harmonic' #cosine or harmonic
+config   = 1 #configuration to copy
+figflag  = 0 #for copying figure_files
+fylflag  = 1 #for copying analysis_files
 
 #-----------------Input Arrays------------------------------------
 
-epsarr_pg   = [0.8]#,1.0,1.2]
-epsarr_ps   = [1.0]#,1.0,1.0]
-epsarr_sg   = [1.0]#,1.0,1.0]
+#epsarr_gg   = [0.8,1.0,1.2]
+#epsarr_ps   = [1.0,1.0,1.0]
+#epsarr_sg   = [1.0,1.0,1.0]
 
-nchains     = 1 # Number of backbone chains
-nmons       = [800] # Number of backbone monomers
+epsarr_gg   = [1.0]
+epsarr_ps   = [1.0]
+epsarr_sg   = [1.0]
+
+nchains     = 2 # Number of backbone chains
+nmons       = [1000] # Number of backbone monomers
 graftMW     = 25  # number of graft monomers per graft
 polywtperc  = 1.0 # total polymer weight percentage
+polydens    = 0.1 # density of the system
 
 #Graft percentage/chain
-graftarr    = [0.01,0.05,0.1,0.15,0.2,0.25,0.3]#,0.24,0.28,0.32] 
-
+#graftarr    = [0.0]
+graftarr    = [0.15]#,0.01,0.05,0.1,0.15,0.2,0.25,0.3]#,0.24,0.28,0.32] 
+#graftarr    = [0.20,0.25,0.30]
 # polydens = totpart/box_volume - explict generic
 # polydens = wt percentage "MC" - implicit MC
-polydens    = 0.5
 
 DS_MC   = '1.80' # String Value
 temp    = '50.0' # String Value 
@@ -55,7 +63,8 @@ temp    = '50.0' # String Value
 #Give prefix for files to be copied followed by *
 fyl_list    = ['avgeival_*','compos_*','eigMCavg_*','indeig_*',\
                'mainpersistautocf_*','rgall_*','rgavgall_*',\
-               'rgMConly_*','rgsys_*']
+               'rgMConly_*','rgsys_*','distcom_*','job*']
+figname     = 'dump_stage_*'
 
 #----------------Directory Settings-------------------------------
 
@@ -108,8 +117,15 @@ for bblen in range(len(nmons)): #Backbone length loop
     else:
         workdir_temp = workdir_bb_main
 
+    #Config directory
+    workdir_config = workdir_temp + '/config_' + str(config)
+    if not os.path.isdir(workdir_config):
+        print(workdir_config, "not found (chains dir)")
+        continue
+    
+
     #Chains directory
-    workdir_chain = workdir_temp + '/nchains_' + str(nchains)
+    workdir_chain = workdir_config + '/nchains_' + str(nchains)
     if not os.path.isdir(workdir_chain):
         print(workdir_chain, "not found (chains dir)")
         continue
@@ -125,14 +141,17 @@ for bblen in range(len(nmons)): #Backbone length loop
     if not os.path.isdir(workdir_graft):
         print(workdir_graft, " does not exist (graftMW dir)")
         continue
+    
+    #Make analysis files output directory
 
+    if fylflag == 1:
+        out_dir = 'out_'+'bbMW_' + str(nmons[bblen]) + \
+                  '_ngMW_' + str(graftMW) + '_rho_'+\
+                  str(polydens) + '_nch_' + str(nchains)
+        anafyl_dir = workdir_graft + '/' + out_dir 
+        if not os.path.isdir(anafyl_dir):
+            os.mkdir(anafyl_dir)
 
-    out_dir = 'out_'+'bbMW_' + str(nmons[bblen]) + \
-              '_ngMW_' + str(graftMW) + '_rho_'+\
-              str(polydens) + '_nch_' + str(nchains)
-    anafyl_dir = workdir_graft + '/' + out_dir 
-    if not os.path.isdir(anafyl_dir):
-        os.mkdir(anafyl_dir)
 
     for glen in range(len(graftarr)): #Graft loop
 
@@ -151,42 +170,98 @@ for bblen in range(len(nmons)): #Backbone length loop
             print(workdir1, " does not exist (grafts per bb)")
             continue
 
-        for eps in range(len(epsarr_pg)): #eps_pg loop
+        for eps in range(len(epsarr_gg)): #eps_pg loop
             
-            workdir3 = workdir1 + '/epsval_' + str(epsarr_pg[eps])
+            workdir3 = workdir1 + '/epsval_' + str(epsarr_gg[eps])
 
             if not os.path.isdir(workdir3):
                 print(workdir3, " does not exist")
                 continue
 
-            workdir4 = workdir3 + '/all_output_data'
-            if not os.path.isdir(workdir4):
-                print(workdir4, " does not exist")
-                continue
+            #Make output directory for figure files if needed
+            if figflag == 1:
+                outfig_name = 'snapshots_'+'config_' + str(config)\
+                              + '_bbMW_' + str(nmons[bblen]) + \
+                              '_ngMW_' + str(graftMW) + '_rho_'+\
+                              str(polydens) + '_nch_' + str(nchains) \
+                              + '_sig_' + str(graftarr[glen]) + \
+                              '_eps_' + str(epsarr_gg[eps])
+ 
+                outfig_dir  = workdir_temp + '/allsnapshots'
+                if not os.path.isdir(outfig_dir):
+                    os.mkdir(outfig_dir)
+                
 
             #------All copying/manipulations--------------------------
-            
-            os.chdir(workdir4)
-            destdir = os.getcwd()
-                
-            for fylcnt in range(len(fyl_list)):
+            if fylflag == 1:
 
-                list_of_files = glob.glob(fyl_list[fylcnt])
-                if list_of_files == []:
-                    print("Did not find files of type",
-                          fyl_list[fylcnt])
+                workdir4 = workdir3 + '/all_output_data'
+                if not os.path.isdir(workdir4):
+                    print(workdir4, " does not exist")
                     continue
+
+                print("Copying output files from", workdir4)
+
+                for fylcnt in range(len(fyl_list)):
+
+                    os.chdir(workdir4)
+                    destdir = os.getcwd()
+                    list_of_files = glob.glob(fyl_list[fylcnt])
+
+                    #search in all_output_data
+                    if list_of_files == []:
+
+                        os.chdir(workdir3)
+                        destdir = workdir3
+                        list_of_files = glob.glob(fyl_list[fylcnt])
+
+                        #search in previous directory
+                        if list_of_files == []:
+                            print("Did not find files of type", \
+                                  fyl_list[fylcnt])
+                            continue
+
+                    print( "Copying files of type: ", fyl_list[fylcnt])
+
+                    for filenum in range(len(list_of_files)):
+
+                        fylname = list_of_files[filenum]
+                        if fyl_list[fylcnt] == 'job*':
+                            anafylname = fylname
+                        else:
+                            outfyl  = fylname.split("_")[0]
+                            anafylname = outfyl + '_' + str(epsarr_gg[eps]) + '_' \
+                                         + str(graftarr[glen]) + '_' + \
+                                         str(nmons[bblen])  + '_' + \
+                                         str(filenum+1) + '.dat'
+
+                        my_cpy_generic(destdir,anafyl_dir,fylname,anafylname)
+
+
+            #Copy all figures if needed
+            if figflag == 1:
+
+                specfig_dir = outfig_dir + '/' + outfig_name
+                if not os.path.isdir(specfig_dir):
+                    os.mkdir(specfig_dir)
+
+                os.chdir(workdir3)
                 
-                print( "Copying files of type: ", fyl_list[fylcnt])
+                #check if figure directory is present
+                fig_maindir = workdir3 + '/fig_files'
+                if not os.path.isdir(fig_maindir):
+                    print(fig_maindir, " does not exist")
+                    continue
+                else:
+                    os.chdir(fig_maindir)
+
+                list_of_files = glob.glob(figname)
+
+                if list_of_files == []:
+                    print("No figure files with ", figname, "in ", fig_maindir) 
 
                 for filenum in range(len(list_of_files)):
 
                     fylname = list_of_files[filenum]
-                    outfyl  = fylname.split("_")[0]
-                    anafylname = outfyl + '_' + str(epsarr_pg[eps]) + '_' \
-                                 + str(graftarr[glen]) + '_' + \
-                                 str(nmons[bblen])  + '_' + \
-                                 str(filenum+1) + '.dat'
-                    
-                    my_cpy_generic(destdir,anafyl_dir,fylname,anafylname)
+                    my_cpy_generic(fig_maindir,outfig_dir,fylname,fylname)
                 

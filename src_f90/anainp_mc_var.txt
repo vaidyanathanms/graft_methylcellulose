@@ -8,7 +8,7 @@ skipfr
 py_skipframes
 nchains
 py_ntotchains
-chain_at_types
+chain_at_types  #including backbone and graft
 9
 1 2 3 4 5 6 7 8 9
 graft_type

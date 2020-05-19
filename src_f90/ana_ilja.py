@@ -29,36 +29,34 @@ from my_python_functions import write_many_files
 # 3.1 - Flexible back bone
 
 graftopt = 2
-nframes  = 50000
+nframes  = 30000
 skframes = 0
 nsolv    = 0
 allana   = 1 #1 - analysis of all dumpfiles, 0 - only latest
 prefix_traj = 'dump_stage_*.lammpstrj'
 wlccheck = 1 #only valid when graftopt = 3, simple WLC model
 anglstyl = 'harmonic' #cosine or harmonic
-config  = 1
+config  = 3
 
 #-----------------Input Arrays------------------------------------
 
 
-epsarr_pg   = [1.0]
-epsarr_ps   = [1.0]
-epsarr_sg   = [1.0]
+#epsarr_pg   = [1.2]
+#epsarr_ps   = [1.0]
+#epsarr_sg   = [1.0]
 
-#epsarr_pg   = [0.8,1.0,1.2]
-#epsarr_ps   = [1.0,1.0,1.0]
-#epsarr_sg   = [1.0,1.0,1.0]
+epsarr_pg   = [0.8,1.0,1.2]
+epsarr_ps   = [1.0,1.0,1.0]
+epsarr_sg   = [1.0,1.0,1.0]
 
-nchains     = 2 # Number of backbone chains
+nchains     = 1 # Number of backbone chains
 nmons       = [1000]#,500,1000,2000]#,500,1000,2000] # Number of backbone monomers
 graftMW     = 25  # number of graft monomers per graft
 polywtperc  = 1.0 # total polymer weight percentage
-polydens    = 0.1
+polydens    = 0.5
 
 #Graft percentage/chain
-graftarr    = [0.15] #[0.0,0.01,0.05,0.1,0.15,0.2,0.25,0.3]
-#graftarr     = [0.15]
-#graftarr    = [0.0,0.01,0.03,0.05,0.1,0.15,0.2,0.25,0.3]
+graftarr    = [0.01,0.03,0.05,0.1,0.15,0.2,0.25,0.3]
 #graftarr    = [0.01,0.03,0.05,0.10,0.15,0.20,0.25,0.30] 
 #graftarr     = [0.20,0.25,0.30]
 
@@ -87,11 +85,10 @@ if not os.path.isdir(scratchdir):
     sys.exit()
 
 #----------------Outfile Settings---------------------------------
-#---Deprecated on March-6-2020 -----------------------------------
+
 cur_year = datetime.datetime.now().strftime("%y")
 cur_mon  = datetime.datetime.now().strftime("%m")
 cur_date = datetime.datetime.now().strftime("%d")
-
 outfyl_ana = 'analysis_data_' + str(cur_mon) + '_' + str(nchains) \
              + '_' + str(cur_date) + '_' + str(cur_year) + '.dat'
 
@@ -110,7 +107,7 @@ for bblen in range(len(nmons)): #Backbone length loop
     elif graftopt == 1:
         workdir_main = workdir_main + '/substitute_grafts_MC' 
     elif graftopt == 2:
-        workdir_main = workdir_main + '/grafts_MC' 
+        workdir_main = workdir_main + '/eps_pg_grafts_MC' 
     elif graftopt == 3:
         if anglstyl == 'cosine':
             workdir_main = workdir_main + '/semiflex_grafts_cosstyle' 
@@ -164,6 +161,15 @@ for bblen in range(len(nmons)): #Backbone length loop
         continue
 
 
+    if bblen == 0: #Create or append log files
+        analys_fyl = workdir_temp+'/'+outfyl_ana
+        if os.path.exists(analys_fyl):
+            fana_out = open(analys_fyl,'a')
+        else:
+            fana_out   = open(analys_fyl,'w')
+            fana_out.write('%s\t%s\t%s\t%s\t%s\n' % ('mw_bb','mw_graft',\
+                                                     'graft_%','eps_pg',\
+                                                     'dumpfile_name'))
     for glen in range(len(graftarr)): #Graft loop
 
         print( "Graft Percentage: ", graftarr[glen])            
@@ -172,7 +178,6 @@ for bblen in range(len(nmons)): #Backbone length loop
         if not os.path.isdir(workdir1):
             print(workdir1, " does not exist")
             continue
-
 
         #Continue iff at least one graft is present
 
@@ -233,6 +238,11 @@ for bblen in range(len(nmons)): #Backbone length loop
                 write_to_file(inpananame,datafyle,latest_traj_fyle,
                               nframes,skframes,nchains,nmons[bblen])
                     
+                fana_out.write('%d\t%d\t%f\t%f\t%s\n' % (nmons[bblen],graftMW,\
+                                                         graftarr[glen],\
+                                                         epsarr_pg[eps],\
+                                                         latest_traj_fyle))
+
                 print("Compiling files and submitting..")
                 subprocess.call(["ifort","-r8","-qopenmp","-mkl","-check",
                                  "-traceback","params.f90","main.f90",
@@ -282,6 +292,7 @@ for bblen in range(len(nmons)): #Backbone length loop
 
                 os.remove('jobana_var.sh')
 
+fana_out.close()
 
 
             

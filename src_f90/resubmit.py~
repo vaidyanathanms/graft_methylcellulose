@@ -282,7 +282,7 @@ def run_autocf(maindir,destdir,srclmp,nmonval,graftval,graftopt):
         desfyl = destdir + '/jobmain_acf_var.sh'
         shutil.copy2(srcfyl, desfyl)
 
-        mainfyl = 'jobmain_acf_var.sh'
+        mainfyl = 'jobmain_movie_var.sh'
         launch_fyl = 'jobmain_acf.sh'
         fr = open(mainfyl,'r')
         fw = open(launch_fyl,'w')

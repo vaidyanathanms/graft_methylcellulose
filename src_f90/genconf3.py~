@@ -31,7 +31,7 @@ from resubmit import run_production_cycle
 # 3 - Grow side chains for semiflexible chains (explicit solv)
 # 3.1 - Fredrickson's case (explicit/implicit solv)
 
-graftopt = 2 # see options above
+graftop  = 2 # see options above
 wlcchec  = 1 # only valid when graftopt = 3, simple WLC model
 mindump  = 20000000 # end point for equilibrium
 maxdump  = 80000000 # maximum dump time
@@ -52,11 +52,11 @@ epsarr_gg   = [0.8,1.0,1.2]#,1.0,1.2]  # graft-graft
 epsarr_sg   = [1.0,1.0,1.2]#,1.0,1.0]  # solvent-graft 
 epsarr_ps   = [1.0,1.0,1.2]#,1.0,1.0]  # polymer-solvent
 
-#epsarr_gg   = [1.0]#,1.2]#,1.2]  # graft-graft
-#epsarr_sg   = [1.0]#,1.0]#,1.0]  # solvent-graft
-#epsarr_ps   = [1.0]#,1.0]#,1.0]  # polymer-solvent
+#epsarr_gg   = [1.2]#,1.0,1.2]  # graft-graft
+#epsarr_sg   = [0.8]#,1.0,1.0]  # solvent-graft
+#epsarr_ps   = [0.8]#,1.0,1.0]  # polymer-solvent
 rcut        = pow(2,1/6)
-#
+
 #Chain and initial configuration details
 nchains     = 1 # Number of backbone chains
 nmons       = [1000]#,500,1000,2000]#,1000,2000] # Number of backbone monomers
@@ -66,9 +66,9 @@ polywtperc  = 1.0 # tot_poly wt% - explicit generic
 polydens    = 0.5 # overall density of polymers
 
 #Graft percentage/chain
-#graftarr    = [0.01,0.05,0.10,0.15,0.20,0.25,0.30] 
+graftarr    = [0.01]#,0.05,0.10,0.15,0.20,0.25,0.30] 
 #graftarr    = [0.20,0.25,0.30]
-graftarr    = [0.2]
+#graftarr    = [0.25]
 #graftarr     = [0.0]
 #graftarr    = [0.0,0.25,0.30]#,0.03,0.05,0.10,0.15,0.25,0.30]
 #For methylcellulose only
@@ -255,8 +255,7 @@ for bblen in range(len(nmons)): #Backbone length loop
                 if latest_restfyl == "nil": #!C: latest_trajfyl == "nil"
                     restflag = -1 #!C: trajflag = -1
                 else:
-                    delimited_vals = re.split("\W+|_",latest_restfyl)
-                    #!C re.split("\W+|_",latest_trajfyl)
+                    delimited_vals = re.split("\W+|_",latest_trajfyl)
                     timeval = delimited_vals[len(delimited_vals)-1] #!C: [len(delimited_vals)-2]
                     #!C: check whether the dumpfile is dump_stage1.*
                     #!C: flagstr = check_integer(timeval)

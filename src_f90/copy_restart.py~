@@ -19,17 +19,15 @@ from my_python_functions import my_cpy_generic
 from my_python_functions import find_recent_file
 from my_python_functions import make_tarfile
 
-#------------------Graft Style------------------------------------
+#------------------Input Options----------------------------------
 
-graftopt = 2 # FOR ALL GRAFTED MC - USE THIS
 # 0 - No grafts
 # 1 - Make PEG as MC substitute 
 # 2 - Grow side chains for MC
 # 3 - Grow side chains for semiflexible chains
 # 3.1 - Flexible back bone
 
-#------------------Input Options----------------------------------
-
+graftopt = 2
 wlccheck = 1 #valid only for graftopt = 3
 anglstyl = 'harmonic' #cosine or harmonic
 config   = 5 #configuration to copy
@@ -165,7 +163,7 @@ for bblen in range(len(nmons)): #Backbone length loop
             print(workdir1, " does not exist (grafts per bb)")
             continue
 
-        anafyl_dir_graft = anafyl_dir + '/graftperc_' + \
+        anafyl_dir_graft = anafyl_dir + '/graft_' + \
                            str(graftarr[glen])
         
         if not os.path.isdir(anafyl_dir_graft):
@@ -181,7 +179,7 @@ for bblen in range(len(nmons)): #Backbone length loop
                 continue
 
 
-            anafyl_dir_eps = anafyl_dir_graft + '/epsval_' + \
+            anafyl_dir_eps = anafyl_dir_graft + '/eps_' + \
                            str(epsarr_gg[eps])
         
             if not os.path.isdir(anafyl_dir_eps):

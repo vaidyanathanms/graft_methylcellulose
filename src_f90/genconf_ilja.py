@@ -1,7 +1,5 @@
 # To generate initial configurations for semiflexible chains
-#!C: Version: V_Feb_14_2019
-# New version: V_Mar_21_2020 see #!C for major change in algorithm
-# New version looks for restart files rather than dump files
+# Version: V_Feb_14_2019
 
 import numpy
 import os
@@ -32,52 +30,49 @@ from resubmit import run_production_cycle
 # 3.1 - Fredrickson's case (explicit/implicit solv)
 
 graftopt = 2 # see options above
-wlcchec  = 1 # only valid when graftopt = 3, simple WLC model
+wlccheck = 1 # only valid when graftopt = 3, simple WLC model
 mindump  = 20000000 # end point for equilibrium
-maxdump  = 80000000 # maximum dump time
 anglstyl = 'harmonic' # cosine or harmonic
-config   = 5 # Trial number
+config   = 4 # Trial number
 if graftopt != 3:
     wlccheck = 0
 
+
 #--- Prof. Ilja's suggestion: Use genconf_ilja.py---------------
-key_eps_pg = 0 # 
-epsval_pg  = 0 #
+key_eps_pg = 1 # 
 
 #-----------------Input Arrays------------------------------------
 
 #Interaction details
 
-epsarr_gg   = [0.8,1.0,1.2]#,1.0,1.2]  # graft-graft
-epsarr_sg   = [1.0,1.0,1.2]#,1.0,1.0]  # solvent-graft 
-epsarr_ps   = [1.0,1.0,1.2]#,1.0,1.0]  # polymer-solvent
+#epsarr_pg   = [0.8.1.0,1.2]  # polymer-graft
+#epsarr_gg   = [0.8,0.8,0.8]  # graft-graft
+#epsarr_sg   = [1.0,1.0,1.0]  # solvent-graft
+#epsarr_ps   = [1.0,1.0,1.0]  # polymer-solvent
 
-#epsarr_gg   = [1.0]#,1.2]#,1.2]  # graft-graft
-#epsarr_sg   = [1.0]#,1.0]#,1.0]  # solvent-graft
-#epsarr_ps   = [1.0]#,1.0]#,1.0]  # polymer-solvent
+epsarr_pg   = [0.8,1.0,1.2]  # polymer-graft
+epsarr_gg   = [0.8,0.8,0.8]  # graft-graft
+epsarr_sg   = [1.0,1.0,1.0]  # solvent-graft
+epsarr_ps   = [1.0,1.0,1.0]  # polymer-solvent
 rcut        = pow(2,1/6)
-#
+
 #Chain and initial configuration details
-nchains     = 1 # Number of backbone chains
+nchains     = 2 # Number of backbone chains
 nmons       = [1000]#,500,1000,2000]#,1000,2000] # Number of backbone monomers
 initcom     = 20.0 # Only for 2 chain systems - d_COM as fn(t)
 graftMW     = 25  # number of graft monomers per graft
 polywtperc  = 1.0 # tot_poly wt% - explicit generic 
-polydens    = 0.5 # overall density of polymers
+polydens    = 0.1 # overall density of polymers
 
 #Graft percentage/chain
-#graftarr    = [0.01,0.05,0.10,0.15,0.20,0.25,0.30] 
-#graftarr    = [0.20,0.25,0.30]
-graftarr    = [0.2]
-#graftarr     = [0.0]
-#graftarr    = [0.0,0.25,0.30]#,0.03,0.05,0.10,0.15,0.25,0.30]
+#graftarr    = [0.0]
+graftarr    = [0.01,0.03,0.05,0.10,0.15,0.25,0.30]
 #For methylcellulose only
 DS_MC   = '1.80' # String Value - only for methylcellulose
 temp    = '50.0' # String Value - for computing parameters for MC
 
 #dump and other filenames
-dumpname = 'dump_stage_*' # include the *
-restname = 'archive_*'    # include the *
+dumpname = 'dump_stage_*' #include the *
 
 #---------------Topology Info ------------------------------------
 
@@ -134,7 +129,7 @@ for bblen in range(len(nmons)): #Backbone length loop
         workdir_main = workdir_main + '/substitute_grafts_MC' 
         print ( "Substituted graft system")
     elif graftopt == 2:
-        workdir_main = workdir_main + '/grafts_MC' 
+        workdir_main = workdir_main + '/eps_pg_grafts_MC' 
         print ( "Side chain graft system")
     elif graftopt == 3:
         if anglstyl == 'cosine':
@@ -201,17 +196,17 @@ for bblen in range(len(nmons)): #Backbone length loop
             os.mkdir(workdir1)
 
 
-        for eps in range(len(epsarr_gg)): #eps_pg loop
+        for eps in range(len(epsarr_pg)): #eps_pg loop
             
             if polywtperc != 1.0:
                 data_fname = "input_" + str(epsarr_ps[eps]) + "_" + \
                              str(epsarr_sg[eps]) + ".dat"
             else:
-                data_fname = "input_" + str(epsarr_gg[eps]) + ".dat"
+                data_fname = "input_" + str(epsarr_pg[eps]) + ".dat"
                 
             print( "EpsValue_polymer_graft: ", epsarr_gg[eps])
 
-            workdir3 = workdir1 + '/epsval_' + str(epsarr_gg[eps])
+            workdir3 = workdir1 + '/epsval_' + str(epsarr_pg[eps])
 
             if not os.path.isdir(workdir3):
                 os.mkdir(workdir3)
@@ -235,52 +230,41 @@ for bblen in range(len(nmons)): #Backbone length loop
                                      polydens,graftMW,initcom,nmons[bblen],\
                                      graftarr[glen],epsarr_gg[eps],graftopt,\
                                      geninp_list,begin_fresh,key_eps_pg,\
-                                     epsval_pg)
+                                     epsarr_pg[eps])
                 
                 
             else:
-
-                restflag = 1 # restart file found = 1                
-                latest_restfyl = find_recent_file(destdir,restname)
-#!C:            trajflag = 1 # trajectory found=1
-#!C:            flagstr  = -1 # is a string = 1
-#!C:            latest_trajfyl = find_recent_file(destdir,
-#!C:                                               dumpname)
-
                 
-                #!C: dumpfile should be of type dump_stage_*
-                #restart file should be of type archive_*
-
-                # check whether archive files are present
-                if latest_restfyl == "nil": #!C: latest_trajfyl == "nil"
-                    restflag = -1 #!C: trajflag = -1
+                trajflag = 1 #trajectory found=1
+                flagstr  = -1 #is a string = 1
+                latest_trajfyl = find_recent_file(destdir,
+                                                  dumpname)
+                #dumpfile should be of type dump_stage_*
+                if latest_trajfyl == "nil":
+                    trajflag = -1
                 else:
-                    delimited_vals = re.split("\W+|_",latest_restfyl)
-                    #!C re.split("\W+|_",latest_trajfyl)
-                    timeval = delimited_vals[len(delimited_vals)-1] #!C: [len(delimited_vals)-2]
-                    #!C: check whether the dumpfile is dump_stage1.*
-                    #!C: flagstr = check_integer(timeval)
-                    #!C: if flagstr == 1:
-                    #!C:    print("Did not find matching dumpfile, restarting")
-                    #!C:    trajflag = -1
-                    if int(timeval) < 1000000: #!C: elif
+                    delimited_vals = re.split("\W+|_",latest_trajfyl)
+                    timeval = delimited_vals[len(delimited_vals)-2]
+                    #check whether the dumpfile is dump_stage1.*
+                    flagstr = check_integer(timeval)
+                    if flagstr == 1:
+                        print("Did not find matching dumpfile, restarting")
+                        trajflag = -1
+                    elif int(timeval) < 1000000:
                         print("Timestep less than 1000000, restarting")
-                        restflag = -1 #!C: trajflag = -1
+                        trajflag = -1
                     else:
                         print("Latest timestep: ", timeval)
 
 
-                if restflag == -1: #!C: trajflag == -1
+                if trajflag == -1:
 
-                    #Files already here needs to be deleted
+                    begin_fresh = -1 #Files already here needs to be deleted
+                    if flagstr == -1:
+                        print("No trajectory file in")
+                    else:
+                        print("Stopped before 1 million steps")
 
-                    begin_fresh = -1 
-                    
-#!C:                    if flagstr == -1:
-#!C:                        print("No trajectory file in")
-#!C:                    else:
-#!C:                        print("Stopped before 1 million steps")
-                    print("No restart files/ stopped before 1 million steps")
                     print("Restarting simulation...")
 
                     start_from_beginning(maindir,srclmp,lmp_execdir,destdir,\
@@ -289,16 +273,12 @@ for bblen in range(len(nmons)): #Backbone length loop
                                          polydens,graftMW,initcom,nmons[bblen],\
                                          graftarr[glen],epsarr_gg[eps],graftopt,\
                                          geninp_list,begin_fresh,key_eps_pg,\
-                                         epsval_pg)
+                                         epsarr_pg[eps])
                     
-                elif int(timeval) > maxdump:
-                    print("Maximum timestep reached")
-                    continue
-
                 elif int(timeval) > mindump:
-                    print("Running production cycle")
-                    run_production_cycle(maindir,destdir,srclmp,nmons[bblen],\
-                                         graftarr[glen],graftopt)
+                        print("Running production cycle")
+                        run_production_cycle(maindir,destdir,srclmp,nmons[bblen],\
+                                             graftarr[glen],graftopt)
 
                 else:
                     print("Running long equil+prod cycles for: ",destdir)
